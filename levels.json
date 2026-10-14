@@ -1,4 +1,5 @@
 {
+  "musicUnlocks": [0, 10, 25, 45],
   "lands": [
     {
       "name": "Land 1",
