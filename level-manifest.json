@@ -23,6 +23,10 @@
     {
       "number": 6,
       "path": "levels/1-1-6.png"
+    },
+    {
+      "number": 7,
+      "path": "levels/1-1-7.png"
     }
   ]
 }

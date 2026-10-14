@@ -319,15 +319,13 @@ function pt(e) {
   const r = cv.getBoundingClientRect();
   return {x:(e.clientX-r.left)*cv.width/r.width, y:(e.clientY-r.top)*cv.height/r.height};
 }
-cv.addEventListener('contextmenu', e => e.preventDefault());
-cv.addEventListener('pointerdown', e => {
-  e.preventDefault(); startAudio();
+// Use native touchstart for phones: it fires as soon as the finger lands.
+// Ignore touch-generated pointer events to avoid processing a touch twice.
+function inputDown(id, q) {
   if (!world) return;
-  cv.setPointerCapture(e.pointerId);
-  const q = pt(e);
   if (menu.open) {
     const c = (q.y >= LIST_TOP && q.y < LIST_TOP+LIST_H) ? colAt(q.x) : -1;
-    ptrs[e.pointerId] = {sy:q.y, col:c, s0:c >= 0 ? menu.scroll[c] : 0, moved:false};
+    ptrs[id] = {sy:q.y, col:c, s0:c >= 0 ? menu.scroll[c] : 0, moved:false};
     return;
   }
   if (inR(q, MB.timer) || (mobile && inR(q, MB.menu))) { openMenu(); return; }
@@ -335,17 +333,13 @@ cv.addEventListener('pointerdown', e => {
   if (won) { nextLevel(); return; }
   if (mobile) {
     const btn = BTNS.find(k => inR(q, TB[k])) || null;
-    ptrs[e.pointerId] = {btn};
+    ptrs[id] = {btn};
     refreshTk();
-
-    // Respond on the touch event itself instead of waiting for the next
-    // 30 Hz physics interval (which can add up to ~33 ms of input delay).
     if (btn && ready) tick();
   }
-});
-cv.addEventListener('pointermove', e => {
-  const o = ptrs[e.pointerId]; if (!o) return;
-  const q = pt(e);
+}
+function inputMove(id, q) {
+  const o = ptrs[id]; if (!o) return;
   if (menu.open) {
     if (o.col >= 0) {
       if (Math.abs(q.y-o.sy) > 6) o.moved = true;
@@ -355,16 +349,48 @@ cv.addEventListener('pointermove', e => {
     const previous = o.btn;
     o.btn = BTNS.find(k => inR(q, TB[k])) || null;
     refreshTk();
-    // Also respond immediately when sliding onto a different control.
     if (o.btn && o.btn !== previous && ready) tick();
   }
+}
+function inputUp(id, q, cancelled = false) {
+  const o = ptrs[id]; if (!o) return;
+  delete ptrs[id]; refreshTk();
+  if (!cancelled && menu.open && !o.moved) menuTap(q);
+}
+cv.addEventListener('contextmenu', e => e.preventDefault());
+cv.addEventListener('touchstart', e => {
+  e.preventDefault();
+  for (const t of e.changedTouches) inputDown('t' + t.identifier, pt(t));
+  startAudio();
+}, {passive:false});
+cv.addEventListener('touchmove', e => {
+  e.preventDefault();
+  for (const t of e.changedTouches) inputMove('t' + t.identifier, pt(t));
+}, {passive:false});
+cv.addEventListener('touchend', e => {
+  e.preventDefault();
+  for (const t of e.changedTouches) inputUp('t' + t.identifier, pt(t));
+}, {passive:false});
+cv.addEventListener('touchcancel', e => {
+  e.preventDefault();
+  for (const t of e.changedTouches) inputUp('t' + t.identifier, pt(t), true);
+}, {passive:false});
+cv.addEventListener('pointerdown', e => {
+  if (e.pointerType === 'touch') return;
+  e.preventDefault();
+  cv.setPointerCapture(e.pointerId);
+  inputDown('p' + e.pointerId, pt(e));
+  startAudio();
+});
+cv.addEventListener('pointermove', e => {
+  if (e.pointerType !== 'touch') inputMove('p' + e.pointerId, pt(e));
 });
 cv.addEventListener('pointerup', e => {
-  const o = ptrs[e.pointerId]; if (!o) return;
-  delete ptrs[e.pointerId]; refreshTk();
-  if (menu.open && !o.moved) menuTap(pt(e));
+  if (e.pointerType !== 'touch') inputUp('p' + e.pointerId, pt(e));
 });
-cv.addEventListener('pointercancel', e => { delete ptrs[e.pointerId]; refreshTk(); });
+cv.addEventListener('pointercancel', e => {
+  if (e.pointerType !== 'touch') inputUp('p' + e.pointerId, pt(e), true);
+});
 cv.addEventListener('wheel', e => {
   if (!menu.open) return;
   e.preventDefault();
