@@ -40,7 +40,7 @@ const menu = {open:false, col:2, sel:[0,0,0], scroll:[0,0,0]};
 const clamp = (v,a,b) => Math.max(a, Math.min(b, v));
 const pct = () => total ? got/total : 1;
 const stars = () => Object.values(save).reduce((a,b) => a+b, 0);
-const lvlId = (L,A,V) => `${L+1}-${A+1}-${V+1}`;
+const lvlId = (L,A,V) => flat.find(e => e.L === L && e.A === A && e.V === V)?.id;
 const areaOpen = (L,A) => stars() >= world.lands[L].areas[A].starsToUnlock;
 const lvlOpen = (L,A,V) => areaOpen(L,A) && (V === 0 || lvlId(L,A,V-1) in save);
 const fmt = s => Math.floor(s/60) + ':' + (s%60).toFixed(2).padStart(5,'0');
@@ -203,14 +203,44 @@ function menuKey(k) {
 }
 
 // ================= LOADING =================
-fetch('levels.json').then(r => r.json()).then(j => {
-  world = j;
-  world.lands.forEach((land,L) => land.areas.forEach((area,A) =>
-    area.levels.forEach((path,V) => flat.push({L,A,V,path,id:lvlId(L,A,V)}))));
-  loadLevel(flat.find(e => lvlOpen(e.L,e.A,e.V) && !(e.id in save)) || flat[0]);
-  setInterval(tick, 1000/30);
-  draw();
-});
+// The Node.js scanner generates level-manifest.json from levels/*.png.
+// Each filename is LAND-AREA-LEVEL.png; JSON defines lands and unlocks only.
+async function initialiseGame() {
+  try {
+    const [configResponse, manifestResponse] = await Promise.all([
+      fetch('levels.json'),
+      fetch('level-manifest.json')
+    ]);
+    if (!configResponse.ok || !manifestResponse.ok)
+      throw new Error('Could not load levels.json or level-manifest.json');
+
+    const config = await configResponse.json();
+    const manifest = await manifestResponse.json();
+    const entries = [];
+
+    config.lands.forEach((land, L) => land.areas.forEach((area, A) => {
+      const key = `${L+1}-${A+1}`;
+      const discovered = (manifest[key] || []).slice()
+        .sort((a, b) => a.number - b.number);
+      area.levels = discovered.map(level => level.path);
+      discovered.forEach((level, V) => entries.push({
+        L, A, V, path: level.path,
+        id: `${L+1}-${A+1}-${level.number}`
+      }));
+    }));
+
+    if (!entries.length) throw new Error('No levels found in configured areas.');
+    flat = entries;
+    world = config;
+    loadLevel(flat.find(e => lvlOpen(e.L,e.A,e.V) && !(e.id in save)) || flat[0]);
+    setInterval(tick, 1000/30);
+    draw();
+  } catch (error) {
+    console.error('Game initialisation failed:', error);
+    document.body.insertAdjacentText('beforeend', 'Could not load game data. Check the console and run node generate-levels.cjs.');
+  }
+}
+initialiseGame();
 
 function loadLevel(e) {
   keys = {}; ready = false; cur = e; menu.sel = [e.L, e.A, e.V];
