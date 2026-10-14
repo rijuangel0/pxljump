@@ -1,0 +1,13 @@
+{
+  "lands": [
+    {
+      "name": "Land 1",
+      "areas": [
+        { "name": "Area 1", "starsToUnlock": 0,
+          "levels": ["levels/1-1-1.png", "levels/1-1-2.png"] },
+        { "name": "Area 2", "starsToUnlock": 10,
+          "levels": ["levels/1-2-1.png"] }
+      ]
+    }
+  ]
+}
