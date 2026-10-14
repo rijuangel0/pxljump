@@ -27,6 +27,18 @@
     {
       "number": 7,
       "path": "levels/1-1-7.png"
+    },
+    {
+      "number": 8,
+      "path": "levels/1-1-8.png"
+    },
+    {
+      "number": 9,
+      "path": "levels/1-1-9.png"
+    },
+    {
+      "number": 10,
+      "path": "levels/1-1-10.png"
     }
   ]
 }
