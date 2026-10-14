@@ -333,7 +333,15 @@ cv.addEventListener('pointerdown', e => {
   if (inR(q, MB.timer) || (mobile && inR(q, MB.menu))) { openMenu(); return; }
   if (mobile && ready && inR(q, MB.retry)) { clearInput(); restart(); return; }
   if (won) { nextLevel(); return; }
-  if (mobile) { ptrs[e.pointerId] = {btn: BTNS.find(k => inR(q, TB[k])) || null}; refreshTk(); }
+  if (mobile) {
+    const btn = BTNS.find(k => inR(q, TB[k])) || null;
+    ptrs[e.pointerId] = {btn};
+    refreshTk();
+
+    // Respond on the touch event itself instead of waiting for the next
+    // 30 Hz physics interval (which can add up to ~33 ms of input delay).
+    if (btn && ready) tick();
+  }
 });
 cv.addEventListener('pointermove', e => {
   const o = ptrs[e.pointerId]; if (!o) return;
@@ -343,7 +351,13 @@ cv.addEventListener('pointermove', e => {
       if (Math.abs(q.y-o.sy) > 6) o.moved = true;
       if (o.moved) { menu.scroll[o.col] = o.s0 - (q.y-o.sy); clampScroll(o.col); }
     }
-  } else if (mobile) { o.btn = BTNS.find(k => inR(q, TB[k])) || null; refreshTk(); }
+  } else if (mobile) {
+    const previous = o.btn;
+    o.btn = BTNS.find(k => inR(q, TB[k])) || null;
+    refreshTk();
+    // Also respond immediately when sliding onto a different control.
+    if (o.btn && o.btn !== previous && ready) tick();
+  }
 });
 cv.addEventListener('pointerup', e => {
   const o = ptrs[e.pointerId]; if (!o) return;
