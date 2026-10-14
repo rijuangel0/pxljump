@@ -61,6 +61,10 @@
     {
       "number": 5,
       "path": "levels/1-2-5.png"
+    },
+    {
+      "number": 6,
+      "path": "levels/1-2-6.png"
     }
   ]
 }
