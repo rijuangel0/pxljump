@@ -2,9 +2,9 @@
 <script src="game.js?v=2"></script>
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
 <style>
-  html, body { margin:0; height:100%; background:#000; overflow:hidden; overscroll-behavior:none;
+  html, body { margin:0; height:100%; height:100dvh; background:#000; overflow:hidden; overscroll-behavior:none;
                display:flex; align-items:center; justify-content:center; }
-  canvas { display:block; width:min(100vw, 200vh); height:auto; touch-action:none;
+  canvas { display:block; width:min(100vw, 200vh); width:min(100vw, 200dvh); height:auto; touch-action:none;
            image-rendering:pixelated; user-select:none; -webkit-user-select:none; }
 </style>
 <canvas id="c"></canvas>
@@ -46,12 +46,15 @@ const menu = {open:false, col:2, sel:[0,0,0], scroll:[0,0,0], tab:0, shopSel:0};
 // ================= PERSONAL SETTINGS =================
 const MARGINS = [[10,5],[8,4],[6,3],[4,2]];          // [horizontal, vertical] scroll margins
 const SCALES = [0.5,0.75,1,1.25,1.5,1.75,2];         // mobile button scale
-const CFG_DEFAULT = {margin:0, scale:1, hide:false};
+const TOP_OFFS = [0, 24, 48, 72];                    // Menu/Retry button drop, in canvas px
+const TOP_NAMES = ['Normal', 'Low', 'Lower', 'Lowest'];
+const CFG_DEFAULT = {margin:0, scale:1, hide:false, top:0};
 let cfg = {...CFG_DEFAULT};
 try { Object.assign(cfg, JSON.parse(localStorage.getItem('plat3bit_cfg') || '{}')); } catch {}
 if (!MARGINS[cfg.margin]) cfg.margin = 0;
 if (!SCALES.includes(cfg.scale)) cfg.scale = 1;
 cfg.hide = !!cfg.hide;
+if (!Number.isInteger(cfg.top) || cfg.top < 0 || cfg.top >= TOP_OFFS.length) cfg.top = 0;
 const saveCfg = () => localStorage.setItem('plat3bit_cfg', JSON.stringify(cfg));
 
 // scale a rect about an anchor point so buttons grow away from their screen corner
@@ -60,18 +63,19 @@ function scaledRect(r, ax, ay) {
   return {x:ax+(r.x-ax)*s, y:ay+(r.y-ay)*s, w:r.w*s, h:r.h*s};
 }
 const tbRect = k => scaledRect(TB[k], k === 'jump' ? 632 : 8, 312);
-const mbRect = k => scaledRect(MB[k], cv.width-4, 26);
+const mbRect = k => { const r = scaledRect(MB[k], cv.width-4, 26); r.y += TOP_OFFS[cfg.top]; return r; };
 
 const clamp = (v,a,b) => Math.max(a, Math.min(b, v));
 const pct = () => total ? got/total : 1;
 const stars = () => Object.values(save).reduce((a,b) => a+b, 0);   // cumulative stars earned
 const lvlId = (L,A,V) => flat.find(e => e.L === L && e.A === A && e.V === V)?.id;
-   const areaCleared = (L,A) => {
-     const lv = flat.filter(e => e.L === L && e.A === A);
-     return lv.length > 0 && lv.every(e => e.id in save);
-   };
-   const areaOpen = (L,A) => A > 0 ? areaCleared(L, A-1)
-     : L > 0 ? areaCleared(L-1, world.lands[L-1].areas.length-1) : true;const lvlOpen = (L,A,V) => areaOpen(L,A) && (V === 0 || lvlId(L,A,V-1) in save);
+const areaCleared = (L,A) => {
+  const lv = flat.filter(e => e.L === L && e.A === A);
+  return lv.length > 0 && lv.every(e => e.id in save);
+};
+const areaOpen = (L,A) => A > 0 ? areaCleared(L, A-1)
+  : L > 0 ? areaCleared(L-1, world.lands[L-1].areas.length-1) : true;
+const lvlOpen = (L,A,V) => areaOpen(L,A) && (V === 0 || lvlId(L,A,V-1) in save);
 const fmt = s => Math.floor(s/60) + ':' + (s%60).toFixed(2).padStart(5,'0');
 const sumTime = f => { let s = 0; for (const e of flat) if (f(e)) { if (!(e.id in times)) return null; s += times[e.id]; } return s; };
 const showT = s => s === null ? '--' : fmt(s);
@@ -171,7 +175,7 @@ function importSave() {
     if (!d || typeof d.stars !== 'object' || typeof d.times !== 'object') throw 0;
     const ok = /^\d+-\d+-\d+$/;
     for (const [id, s] of Object.entries(d.stars || {}))
-      if (ok.test(id) && [0,1,2].includes(s)) save[id] = Math.max(save[id] ?? 0, s);
+      if (ok.test(id) && [0,1,2,3].includes(s)) save[id] = Math.max(save[id] ?? 0, s);
     for (const [id, t] of Object.entries(d.times || {}))
       if (ok.test(id) && typeof t === 'number' && t > 0 && t < 1e6) times[id] = Math.min(times[id] ?? Infinity, t);
     if (Array.isArray(d.shop))
@@ -198,6 +202,7 @@ const act = {
   margin()   { cfg.margin = (cfg.margin+1) % MARGINS.length; saveCfg(); },
   pads()     { cfg.scale = SCALES[(SCALES.indexOf(cfg.scale)+1) % SCALES.length]; saveCfg(); },
   hide()     { cfg.hide = !cfg.hide; saveCfg(); },
+  top()      { cfg.top = (cfg.top+1) % TOP_OFFS.length; saveCfg(); },
   defaults() { cfg = {...CFG_DEFAULT}; saveCfg(); }
 };
 function openMenu() {
@@ -235,16 +240,19 @@ function menuButtons() {
     });
   }
   if (menu.tab === 2) {
-    [ ['Edge: ' + MARGINS[cfg.margin].join('x'), act.margin],
+    const items = [['Edge: ' + MARGINS[cfg.margin].join('x'), act.margin]];
+    if (mobile) items.push(
       ['Pads: ' + cfg.scale + 'x', act.pads],
       ['Hide btns: ' + (cfg.hide ? 'On' : 'Off'), act.hide],
+      ['Top btns: ' + TOP_NAMES[cfg.top], act.top]);
+    items.push(
       ['Mode: ' + (mobile ? 'Mobile' : 'PC'), act.mode],
       ['Defaults', act.defaults],
       ['Export', exportSave],
       ['Import', importSave],
       ['Reset times', act.rtimes],
-      ['Reset game', act.rgame] ]
-    .forEach(([label, fn], i) => out.push({label, act:fn, x:20+(i%3)*206, y:44+Math.floor(i/3)*52, w:190, h:36}));
+      ['Reset game', act.rgame]);
+    items.forEach(([label, fn], i) => out.push({label, act:fn, x:20+(i%3)*206, y:38+Math.floor(i/3)*46, w:190, h:34}));
   }
   return out;
 }
@@ -268,8 +276,8 @@ function menuKey(k) {
   if (k === 't') return act.rtimes();
   if (k === 'g') return act.rgame();
   if (k === 'k') return act.margin();
-  if (k === 'z') return act.pads();
-  if (k === 'h') return act.hide();
+  if (k === 'z' && mobile) return act.pads();
+  if (k === 'h' && mobile) return act.hide();
   if (k === '1' || k === '2' || k === '3') { menu.tab = +k - 1; return; }
   if (menu.tab === 1) {
     if (k === 'ArrowDown' || k === 'ArrowUp') menu.shopSel = clamp(menu.shopSel + (k === 'ArrowDown' ? 1 : -1), 0, TRACKS.length-1);
@@ -328,10 +336,13 @@ async function initialiseGame() {
 }
 initialiseGame();
 
+let loadSeq = 0;
 function loadLevel(e) {
+  const seq = ++loadSeq;
   keys = {}; ready = false; cur = e; menu.sel = [e.L, e.A, e.V];
   const img = new Image();
   img.onload = () => {
+    if (seq !== loadSeq) return;     // a newer level was picked while this one loaded
     w = img.width; h = img.height;
     const o = document.createElement('canvas'); o.width = w; o.height = h;
     const oc = o.getContext('2d'); oc.drawImage(img, 0, 0);
@@ -575,7 +586,7 @@ function menuCols() {
   const [L, A] = menu.sel;
   return [
     world.lands.map((l,i) => ({t:l.name, ok:areaOpen(i,0)})),
-           world.lands[L].areas.map((a,i) => ({t:a.name + (areaOpen(L,i) ? '' : ' (locked)'), ok:areaOpen(L,i)})),
+    world.lands[L].areas.map((a,i) => ({t:a.name + (areaOpen(L,i) ? '' : ' (locked)'), ok:areaOpen(L,i)})),
     world.lands[L].areas[A].levels.map((_,i) => { const id = lvlId(L,A,i);
       return {t:id + (id in save ? ' ✓' + (save[id] ? ' ' + '★'.repeat(save[id]) : '') : '') + (id in times ? ' - ' + fmt(times[id]) : ''), ok:lvlOpen(L,A,i)}; })
   ];
@@ -618,9 +629,12 @@ function drawShopTab() {
 
 function drawSettingsTab() {
   ctx.fillStyle = '#888'; ctx.font = '11px monospace';
-  ctx.fillText('Edge: how close to the screen edge before scrolling (across x down, tiles)', 20, 222);
-  ctx.fillText('Pads: mobile button size.   Hide btns: hides Menu/Retry during play.', 20, 238);
-  ctx.fillText('Tap the timer (top-right) to open the menu if buttons are hidden.', 20, 254);
+  const lines = ['Edge: how close to the screen edge before scrolling (across x down, tiles)'];
+  if (mobile) lines.push(
+    'Pads: mobile button size.   Hide btns: hides Menu/Retry during play.',
+    'Top btns: lowers Menu/Retry if the top of the screen is cut off.',
+    'Tap the timer (top-right) to open the menu if buttons are hidden.');
+  lines.forEach((t, i) => ctx.fillText(t, 20, 228 + i*14));
 }
 
 function drawMenu() {
