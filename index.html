@@ -21,6 +21,7 @@ cv.width = VW*T; cv.height = VH*T;
 // menu layout
 const LIST_TOP = 28, LIST_H = 224, ROW = 14, COLX = [20,230,440], COLW = 190;
 const BTN_Y = 292, BTN_H = 24;
+const TABS = ['Levels','Shop','Settings'];
 // touch layout
 const BTNS = ['left','right','jump'];
 const TB = { left:{x:8,y:246,w:68,h:66}, right:{x:84,y:246,w:68,h:66}, jump:{x:556,y:238,w:76,h:74} };
@@ -36,14 +37,37 @@ let cur, orig, map, w, h, total, got, start, spawn, gate, arch;
 let p, cam = {x:0, y:0}, won = false, ready = false, keys = {};
 let ticks = 0, running = false, toast = null;
 const ptrs = {}; let tk = {};
-const menu = {open:false, col:2, sel:[0,0,0], scroll:[0,0,0]};
+const menu = {open:false, col:2, sel:[0,0,0], scroll:[0,0,0], tab:0, shopSel:0};
+
+// ================= PERSONAL SETTINGS =================
+const MARGINS = [[10,5],[8,4],[6,3],[4,2]];          // [horizontal, vertical] scroll margins
+const SCALES = [0.5,0.75,1,1.25,1.5,1.75,2];         // mobile button scale
+const CFG_DEFAULT = {margin:0, scale:1, hide:false};
+let cfg = {...CFG_DEFAULT};
+try { Object.assign(cfg, JSON.parse(localStorage.getItem('plat3bit_cfg') || '{}')); } catch {}
+if (!MARGINS[cfg.margin]) cfg.margin = 0;
+if (!SCALES.includes(cfg.scale)) cfg.scale = 1;
+cfg.hide = !!cfg.hide;
+const saveCfg = () => localStorage.setItem('plat3bit_cfg', JSON.stringify(cfg));
+
+// scale a rect about an anchor point so buttons grow away from their screen corner
+function scaledRect(r, ax, ay) {
+  const s = cfg.scale;
+  return {x:ax+(r.x-ax)*s, y:ay+(r.y-ay)*s, w:r.w*s, h:r.h*s};
+}
+const tbRect = k => scaledRect(TB[k], k === 'jump' ? 632 : 8, 312);
+const mbRect = k => scaledRect(MB[k], cv.width-4, 26);
 
 const clamp = (v,a,b) => Math.max(a, Math.min(b, v));
 const pct = () => total ? got/total : 1;
-const stars = () => Object.values(save).reduce((a,b) => a+b, 0);
+const stars = () => Object.values(save).reduce((a,b) => a+b, 0);   // cumulative stars earned
 const lvlId = (L,A,V) => flat.find(e => e.L === L && e.A === A && e.V === V)?.id;
-const areaOpen = (L,A) => stars() >= world.lands[L].areas[A].starsToUnlock;
-const lvlOpen = (L,A,V) => areaOpen(L,A) && (V === 0 || lvlId(L,A,V-1) in save);
+   const areaCleared = (L,A) => {
+     const lv = flat.filter(e => e.L === L && e.A === A);
+     return lv.length > 0 && lv.every(e => e.id in save);
+   };
+   const areaOpen = (L,A) => A > 0 ? areaCleared(L, A-1)
+     : L > 0 ? areaCleared(L-1, world.lands[L-1].areas.length-1) : true;const lvlOpen = (L,A,V) => areaOpen(L,A) && (V === 0 || lvlId(L,A,V-1) in save);
 const fmt = s => Math.floor(s/60) + ':' + (s%60).toFixed(2).padStart(5,'0');
 const sumTime = f => { let s = 0; for (const e of flat) if (f(e)) { if (!(e.id in times)) return null; s += times[e.id]; } return s; };
 const showT = s => s === null ? '--' : fmt(s);
@@ -71,8 +95,17 @@ const TRACKS = [
     lead:[74,0,77,0, 81,0,77,0, 72,0,76,0, 79,0,76,0],
     bass:[38,0,38,0, 38,0,38,0, 36,0,36,0, 36,0,36,0] }
 ];
-const unlocks = () => TRACKS.map((t,i) => world?.musicUnlocks?.[i] ?? t.unlock);
-const trackOpen = i => stars() >= unlocks()[i];
+// song prices (the old unlock stars) and purchases
+const price = i => world?.musicUnlocks?.[i] ?? TRACKS[i].unlock;
+let shop = [];                                        // indexes of purchased songs
+try { shop = JSON.parse(localStorage.getItem('plat3bit_shop') || '[]'); } catch {}
+shop = Array.isArray(shop) ? shop.filter(i => Number.isInteger(i) && i >= 0 && i < TRACKS.length) : [];
+const saveShop = () => localStorage.setItem('plat3bit_shop', JSON.stringify(shop));
+const owned = i => price(i) <= 0 || shop.includes(i);
+const spent = () => shop.reduce((a,i) => a + Math.max(0, price(i)), 0);
+const balance = () => stars() - spent();              // cumulative minus spent
+const affordable = () => TRACKS.filter((_,i) => !owned(i) && price(i) <= balance()).length;
+const trackOpen = i => owned(i);
 const musicName = () => (mIdx >= 0 && mIdx < TRACKS.length && trackOpen(mIdx)) ? TRACKS[mIdx].name : 'Off';
 let ac = null, musicTimer = null, mStep = 0, mNext = 0;
 let mIdx = +(localStorage.getItem('plat3bit_music') ?? 0);
@@ -110,10 +143,19 @@ function cycleMusic() {
   localStorage.setItem('plat3bit_music', mIdx);
   startAudio(); applyMusic();
 }
+// shop: play an owned song, or buy (and play) one you can afford
+function shopAct(i) {
+  if (i < 0 || i >= TRACKS.length) return;
+  if (owned(i)) mIdx = i;
+  else if (balance() >= price(i)) { shop.push(i); saveShop(); mIdx = i; }
+  else return;
+  localStorage.setItem('plat3bit_music', mIdx);
+  startAudio(); applyMusic();
+}
 
 // ================= SAVE import / export =================
 function exportSave() {
-  const code = btoa(JSON.stringify({v:1, stars:save, times}));
+  const code = btoa(JSON.stringify({v:1, stars:save, times, shop}));
   navigator.clipboard?.writeText(code).catch(() => {});
   prompt('Your save code (copied if your browser allows):', code);
 }
@@ -128,7 +170,9 @@ function importSave() {
       if (ok.test(id) && [0,1,2].includes(s)) save[id] = Math.max(save[id] ?? 0, s);
     for (const [id, t] of Object.entries(d.times || {}))
       if (ok.test(id) && typeof t === 'number' && t > 0 && t < 1e6) times[id] = Math.min(times[id] ?? Infinity, t);
-    persist();
+    if (Array.isArray(d.shop))
+      for (const i of d.shop) if (Number.isInteger(i) && i >= 0 && i < TRACKS.length && !shop.includes(i)) shop.push(i);
+    persist(); saveShop();
     alert('Save imported.');
   } catch { alert('That save code is not valid.'); }
 }
@@ -140,15 +184,20 @@ const act = {
   mode()   { mobile = !mobile; localStorage.setItem('plat3bit_mode', mobile ? 'm' : 'p'); clearInput(); },
   rtimes() { if (confirm('Reset all best times?')) { times = {}; persist(); } },
   rgame()  {
-    if (!confirm('Reset ALL progress (stars, times and music unlocks)?')) return;
+    if (!confirm('Reset ALL progress (stars, times and purchased songs)?')) return;
     save = {}; times = {}; persist();
+    shop = []; saveShop();
     mIdx = 0; localStorage.setItem('plat3bit_music', 0); applyMusic();
-    menu.scroll = [0,0,0]; menu.col = 2;
+    menu.scroll = [0,0,0]; menu.col = 2; menu.tab = 0;
     loadLevel(flat[0]);
-  }
+  },
+  margin()   { cfg.margin = (cfg.margin+1) % MARGINS.length; saveCfg(); },
+  pads()     { cfg.scale = SCALES[(SCALES.indexOf(cfg.scale)+1) % SCALES.length]; saveCfg(); },
+  hide()     { cfg.hide = !cfg.hide; saveCfg(); },
+  defaults() { cfg = {...CFG_DEFAULT}; saveCfg(); }
 };
 function openMenu() {
-  clearInput(); menu.open = true; menu.col = 2;
+  clearInput(); menu.open = true; menu.col = 2; menu.tab = 0;
   if (cur) menu.sel = [cur.L, cur.A, cur.V];
   menu.scroll = [0,0,0];
   for (let c = 0; c < 3; c++) ensureVisible(c);
@@ -169,14 +218,36 @@ function startSel() {
   if (lvlOpen(L,A,V)) { loadLevel(flat.find(e => e.L === L && e.A === A && e.V === V)); menu.open = false; }
 }
 function menuButtons() {
-  const defs = [
-    ['Close', act.close], ['♪ ' + musicName(), act.music], ['Export', exportSave], ['Import', importSave],
-    ['Mode: ' + (mobile ? 'Mobile' : 'PC'), act.mode], ['Reset times', act.rtimes], ['Reset game', act.rgame] ];
-  return defs.map(([label, fn], i) => ({label, act:fn, x:8+i*88, y:BTN_Y, w:84, h:BTN_H}));
+  const out = [];
+  TABS.forEach((t, i) => out.push({label:t, act:() => { menu.tab = i; }, x:8+i*88, y:2, w:84, h:22, on:menu.tab === i}));
+  out.push({label:'Close', act:act.close, x:8, y:BTN_Y, w:84, h:BTN_H});
+  out.push({label:'♪ ' + musicName(), act:act.music, x:96, y:BTN_Y, w:84, h:BTN_H});
+  if (menu.tab === 1) {
+    TRACKS.forEach((t, i) => {
+      const has = owned(i), can = balance() >= price(i);
+      out.push({
+        label: has ? (mIdx === i ? 'Playing' : 'Play') : (can ? 'Buy ' + price(i) + '★' : price(i) + '★'),
+        act: () => shopAct(i), x:450, y:44+i*50, w:160, h:32, dim: !has && !can });
+    });
+  }
+  if (menu.tab === 2) {
+    [ ['Edge: ' + MARGINS[cfg.margin].join('x'), act.margin],
+      ['Pads: ' + cfg.scale + 'x', act.pads],
+      ['Hide btns: ' + (cfg.hide ? 'On' : 'Off'), act.hide],
+      ['Mode: ' + (mobile ? 'Mobile' : 'PC'), act.mode],
+      ['Defaults', act.defaults],
+      ['Export', exportSave],
+      ['Import', importSave],
+      ['Reset times', act.rtimes],
+      ['Reset game', act.rgame] ]
+    .forEach(([label, fn], i) => out.push({label, act:fn, x:20+(i%3)*206, y:44+Math.floor(i/3)*52, w:190, h:36}));
+  }
+  return out;
 }
 const colAt = x => x < 16 || x > 630 ? -1 : x < 222 ? 0 : x < 432 ? 1 : 2;
 function menuTap(q) {
   for (const b of menuButtons()) if (inR(q, b)) { b.act(); return; }
+  if (menu.tab !== 0) return;
   if (q.y < LIST_TOP || q.y >= LIST_TOP+LIST_H) return;
   const c = colAt(q.x); if (c < 0) return;
   const i = Math.floor((q.y-LIST_TOP+menu.scroll[c])/ROW);
@@ -192,6 +263,16 @@ function menuKey(k) {
   if (k === 'c') return act.mode();
   if (k === 't') return act.rtimes();
   if (k === 'g') return act.rgame();
+  if (k === 'k') return act.margin();
+  if (k === 'z') return act.pads();
+  if (k === 'h') return act.hide();
+  if (k === '1' || k === '2' || k === '3') { menu.tab = +k - 1; return; }
+  if (menu.tab === 1) {
+    if (k === 'ArrowDown' || k === 'ArrowUp') menu.shopSel = clamp(menu.shopSel + (k === 'ArrowDown' ? 1 : -1), 0, TRACKS.length-1);
+    if (k === 'Enter') shopAct(menu.shopSel);
+    return;
+  }
+  if (menu.tab !== 0) return;
   if (k === 'ArrowLeft')  menu.col = Math.max(0, menu.col-1);
   if (k === 'ArrowRight') menu.col = Math.min(2, menu.col+1);
   if (k === 'ArrowDown' || k === 'ArrowUp') {
@@ -285,10 +366,11 @@ function restart() {
 function respawn() { p = {x:spawn.x, y:spawn.y, vy:0, ry:0, rx:0}; snapCam(true); }
 
 function snapCam(force) {
+  const [mx, my] = MARGINS[cfg.margin];
   const cx = p.x + PLW/2, cy = p.y + PLH/2;
-  if (force || cx-cam.x < 10 || cam.x+VW-cx < 10)
+  if (force || cx-cam.x < mx || cam.x+VW-cx < mx)
     cam.x = clamp(Math.round((cx-VW/2)/PGW)*PGW, 0, Math.max(0, w-VW));
-  if (force || cy-cam.y < 5 || cam.y+VH-cy < 5)
+  if (force || cy-cam.y < my || cam.y+VH-cy < my)
     cam.y = clamp(Math.round((cy-VH/2)/PGH)*PGH, 0, Math.max(0, h-VH));
 }
 
@@ -325,15 +407,15 @@ function pt(e) {
 function inputDown(id, q) {
   if (!world) return;
   if (menu.open) {
-    const c = (q.y >= LIST_TOP && q.y < LIST_TOP+LIST_H) ? colAt(q.x) : -1;
+    const c = (menu.tab === 0 && q.y >= LIST_TOP && q.y < LIST_TOP+LIST_H) ? colAt(q.x) : -1;
     ptrs[id] = {sy:q.y, col:c, s0:c >= 0 ? menu.scroll[c] : 0, moved:false};
     return;
   }
-  if (inR(q, MB.timer) || (mobile && inR(q, MB.menu))) { openMenu(); return; }
-  if (mobile && ready && inR(q, MB.retry)) { clearInput(); restart(); return; }
+  if (inR(q, MB.timer) || (mobile && !cfg.hide && inR(q, mbRect('menu')))) { openMenu(); return; }
+  if (mobile && !cfg.hide && ready && inR(q, mbRect('retry'))) { clearInput(); restart(); return; }
   if (won) { nextLevel(); return; }
   if (mobile) {
-    const btn = BTNS.find(k => inR(q, TB[k])) || null;
+    const btn = BTNS.find(k => inR(q, tbRect(k))) || null;
     ptrs[id] = {btn};
     refreshTk();
     if (btn && ready) tick();
@@ -348,7 +430,7 @@ function inputMove(id, q) {
     }
   } else if (mobile) {
     const previous = o.btn;
-    o.btn = BTNS.find(k => inR(q, TB[k])) || null;
+    o.btn = BTNS.find(k => inR(q, tbRect(k))) || null;
     refreshTk();
     if (o.btn && o.btn !== previous && ready) tick();
   }
@@ -393,7 +475,7 @@ cv.addEventListener('pointercancel', e => {
   if (e.pointerType !== 'touch') inputUp('p' + e.pointerId, pt(e), true);
 });
 cv.addEventListener('wheel', e => {
-  if (!menu.open) return;
+  if (!menu.open || menu.tab !== 0) return;
   e.preventDefault();
   const c = colAt(pt(e).x); if (c < 0) return;
   menu.scroll[c] += e.deltaY > 0 ? ROW*3 : -ROW*3; clampScroll(c);
@@ -445,14 +527,13 @@ function interact() {
     if (v === 6) { map[y][x] = 0; got++; setArch(); }
     if (v === 2 && pct() >= 0.7) {
       won = true;
-      const was = TRACKS.filter((_,k) => trackOpen(k)).length;
+      const was = affordable();
       const s = pct() >= 1 ? 2 : pct() >= 0.9 ? 1 : 0;
       save[cur.id] = Math.max(save[cur.id] ?? 0, s);
       const tm = ticks/30;
       if (!(cur.id in times) || tm < times[cur.id]) times[cur.id] = tm;
       persist();
-      const now = TRACKS.filter((_,k) => trackOpen(k)).length;
-      if (now > was) toast = {t:'Music unlocked: ' + TRACKS[now-1].name, until:performance.now()+4000};
+      if (affordable() > was) toast = {t:'New song available in the Shop!', until:performance.now()+4000};
       return;
     }
   }
@@ -466,33 +547,37 @@ function label(t, x, y) {
   ctx.fillStyle = '#fff'; ctx.fillText(t, x+4, y+13);
 }
 
+function pill(t, r) {
+  ctx.fillStyle = '#000'; ctx.fillRect(r.x, r.y, r.w, r.h);
+  ctx.font = (12*cfg.scale) + 'px monospace'; ctx.fillStyle = '#fff';
+  ctx.fillText(t, r.x+r.w/2, r.y+r.h/2+4*cfg.scale);
+}
+
 function drawTouch() {
-  ctx.font = '28px monospace'; ctx.textAlign = 'center';
+  const s = cfg.scale;
+  ctx.font = (28*s) + 'px monospace'; ctx.textAlign = 'center';
   const g = {left:'◀', right:'▶', jump:'▲'};
   for (const k of BTNS) {
-    const r = TB[k];
+    const r = tbRect(k);
     ctx.globalAlpha = tk[k] ? 0.6 : 0.3; ctx.fillStyle = '#fff'; ctx.fillRect(r.x, r.y, r.w, r.h);
-    ctx.globalAlpha = 0.9; ctx.fillStyle = '#000'; ctx.fillText(g[k], r.x+r.w/2, r.y+r.h/2+10);
+    ctx.globalAlpha = 0.9; ctx.fillStyle = '#000'; ctx.fillText(g[k], r.x+r.w/2, r.y+r.h/2+10*s);
   }
-  ctx.globalAlpha = 1; ctx.textAlign = 'left';
-  label('☰ Menu', MB.menu.x, MB.menu.y);
-  label('↻ Retry', MB.retry.x, MB.retry.y);
+  ctx.globalAlpha = 1;
+  if (!cfg.hide) { pill('☰ Menu', mbRect('menu')); pill('↻ Retry', mbRect('retry')); }
+  ctx.textAlign = 'left';
 }
 
 function menuCols() {
   const [L, A] = menu.sel;
   return [
     world.lands.map((l,i) => ({t:l.name, ok:areaOpen(i,0)})),
-    world.lands[L].areas.map((a,i) => ({t:a.name + (areaOpen(L,i) ? '' : ` (${a.starsToUnlock}★)`), ok:areaOpen(L,i)})),
+           world.lands[L].areas.map((a,i) => ({t:a.name + (areaOpen(L,i) ? '' : ' (locked)'), ok:areaOpen(L,i)})),
     world.lands[L].areas[A].levels.map((_,i) => { const id = lvlId(L,A,i);
       return {t:id + (id in save ? ' ✓' + '★'.repeat(save[id]) : '') + (id in times ? ' ' + fmt(times[id]) : ''), ok:lvlOpen(L,A,i)}; })
   ];
 }
 
-function drawMenu() {
-  ctx.fillStyle = '#000'; ctx.fillRect(0, 0, cv.width, cv.height);
-  ctx.font = '12px monospace'; ctx.fillStyle = '#fff';
-  ctx.fillText('Stars: ' + stars() + '   Arrows/Enter, wheel or drag to scroll   P: close', 10, 16);
+function drawLevelsTab() {
   const [L, A] = menu.sel;
   menuCols().forEach((list, c) => {
     ctx.save(); ctx.beginPath(); ctx.rect(COLX[c]-4, LIST_TOP, COLW+4, LIST_H); ctx.clip();
@@ -511,14 +596,42 @@ function drawMenu() {
   const ty = LIST_TOP + LIST_H + 14;
   ctx.fillText('Land total: ' + showT(sumTime(e => e.L === L)), 20, ty);
   ctx.fillText('Area total: ' + showT(sumTime(e => e.L === L && e.A === A)), 20, ty+14);
-  const nx = TRACKS.findIndex((_,i) => !trackOpen(i));
+  const nx = TRACKS.findIndex((_,i) => !owned(i));
   ctx.fillText('Music: ' + musicName(), 330, ty);
-  ctx.fillText(nx < 0 ? 'All tracks unlocked' : 'Next track: ' + unlocks()[nx] + '★', 330, ty+14);
+  ctx.fillText(nx < 0 ? 'All songs owned' : 'Next song: ' + price(nx) + '★ (Shop)', 330, ty+14);
+}
+
+function drawShopTab() {
+  TRACKS.forEach((t, i) => {
+    const y = 44 + i*50;
+    if (menu.shopSel === i) { ctx.fillStyle = '#333'; ctx.fillRect(16, y-4, 608, 40); }
+    ctx.fillStyle = '#fff'; ctx.font = '14px monospace'; ctx.fillText(t.name, 28, y+14);
+    ctx.fillStyle = '#aaa'; ctx.font = '12px monospace'; ctx.fillText(owned(i) ? 'Owned' : 'Price: ' + price(i) + '★', 28, y+30);
+  });
+  ctx.fillStyle = '#fff'; ctx.font = '12px monospace';
+  ctx.fillText('Cumulative: ' + stars() + '★   Spent: ' + spent() + '★   Balance: ' + balance() + '★', 28, 266);
+}
+
+function drawSettingsTab() {
+  ctx.fillStyle = '#888'; ctx.font = '11px monospace';
+  ctx.fillText('Edge: how close to the screen edge before scrolling (across x down, tiles)', 20, 222);
+  ctx.fillText('Pads: mobile button size.   Hide btns: hides Menu/Retry during play.', 20, 238);
+  ctx.fillText('Tap the timer (top-right) to open the menu if buttons are hidden.', 20, 254);
+}
+
+function drawMenu() {
+  ctx.fillStyle = '#000'; ctx.fillRect(0, 0, cv.width, cv.height);
+  ctx.font = '12px monospace'; ctx.fillStyle = '#fff'; ctx.textAlign = 'left';
+  ctx.fillText('Cumulative: ' + stars() + '★   Balance: ' + balance() + '★', 290, 16);
+  if (menu.tab === 0) drawLevelsTab();
+  else if (menu.tab === 1) drawShopTab();
+  else drawSettingsTab();
   ctx.font = '11px monospace'; ctx.textAlign = 'center';
   for (const b of menuButtons()) {
+    if (b.on) { ctx.fillStyle = '#a0f'; ctx.fillRect(b.x, b.y, b.w, b.h); }
     ctx.strokeStyle = '#fff'; ctx.lineWidth = 1; ctx.strokeRect(b.x+.5, b.y+.5, b.w-1, b.h-1);
-    ctx.fillStyle = b.label.startsWith('Reset') ? '#f00' : '#fff';
-    ctx.fillText(b.label, b.x+b.w/2, b.y+16);
+    ctx.fillStyle = b.label.startsWith('Reset') ? '#f00' : b.dim ? '#666' : '#fff';
+    ctx.fillText(b.label, b.x+b.w/2, b.y+b.h/2+4);
   }
   ctx.textAlign = 'left';
 }
