@@ -14,6 +14,10 @@ const SPEED = 0.75;                    // 1 = full speed; lower = slower (~30*SP
 const T = 16, VW = 40, VH = 20;        // tile size, view size (tiles)
 const PGW = 20, PGH = 10;              // page size (view shifts in these steps)
 const PLW = 2, PLH = 3;                // player size
+const CLEAR = 0.5;                     // fraction of coins needed to clear a level
+const STAR_AT = [0.75, 0.9, 1];        // coin fractions for 1, 2 and 3 stars
+const CEIL = 0;                        // top rows of the map the player can't enter
+const starsFor = f => STAR_AT.filter(t => f >= t).length;
 const COLORS = ['#000','#00f','#0f0','#0ff','#f00','#a0f','#ff0','#fff'];
 const cv = document.getElementById('c'), ctx = cv.getContext('2d');
 cv.width = VW*T; cv.height = VH*T;
@@ -354,7 +358,7 @@ function loadLevel(e) {
 }
 
 function setArch() {
-  const on = pct() < 0.7;
+  const on = pct() < CLEAR;
   for (const [x,y] of arch) if (orig[y]?.[x] === 0) map[y][x] = on ? 4 : 0;
 }
 function restart() {
@@ -482,7 +486,7 @@ cv.addEventListener('wheel', e => {
 }, {passive:false});
 
 // ================= GAME LOGIC =================
-const tile = (x, y) => (x < 0 || x >= w) ? 7 : (y < 0 || y >= h ? 0 : map[y][x]);
+const tile = (x, y) => (x < 0 || x >= w || y < CEIL) ? 7 : (y >= h ? 0 : map[y][x]);
 function blocked(px, py) {
   for (let j = 0; j < PLH; j++) for (let i = 0; i < PLW; i++)
     if (tile(px+i, py+j) === 7) return true;
@@ -506,7 +510,7 @@ function tick() {
     }
   } else p.rx = 0;
 
-  if (jump && blocked(p.x, p.y+1)) p.vy = -1.2;      // jump strength (~4 blocks)
+  if (jump && blocked(p.x, p.y+1)) { p.vy = -1.2; p.ry = 0; }   // jump strength (4 blocks)
   p.vy = Math.min(p.vy + 0.15, 2);                   // gravity, terminal velocity
   p.ry += p.vy;
   while (Math.abs(p.ry) >= 1) {
@@ -525,10 +529,10 @@ function interact() {
     if (v === 4) { respawn(); return; }
     if (v === 3) spawn = {x:p.x, y:p.y};
     if (v === 6) { map[y][x] = 0; got++; setArch(); }
-    if (v === 2 && pct() >= 0.7) {
+    if (v === 2 && pct() >= CLEAR) {
       won = true;
       const was = affordable();
-      const s = pct() >= 1 ? 2 : pct() >= 0.9 ? 1 : 0;
+      const s = starsFor(pct());
       save[cur.id] = Math.max(save[cur.id] ?? 0, s);
       const tm = ticks/30;
       if (!(cur.id in times) || tm < times[cur.id]) times[cur.id] = tm;
@@ -573,7 +577,7 @@ function menuCols() {
     world.lands.map((l,i) => ({t:l.name, ok:areaOpen(i,0)})),
            world.lands[L].areas.map((a,i) => ({t:a.name + (areaOpen(L,i) ? '' : ' (locked)'), ok:areaOpen(L,i)})),
     world.lands[L].areas[A].levels.map((_,i) => { const id = lvlId(L,A,i);
-      return {t:id + (id in save ? ' ✓' + '★'.repeat(save[id]) : '') + (id in times ? ' ' + fmt(times[id]) : ''), ok:lvlOpen(L,A,i)}; })
+      return {t:id + (id in save ? ' ✓' + (save[id] ? ' ' + '★'.repeat(save[id]) : '') : '') + (id in times ? ' - ' + fmt(times[id]) : ''), ok:lvlOpen(L,A,i)}; })
   ];
 }
 
@@ -645,7 +649,7 @@ function draw() {
     }
     ctx.fillStyle = COLORS[5];
     ctx.fillRect((p.x-cam.x)*T, (p.y-cam.y)*T, PLW*T, PLH*T);
-    label(`${cur.id}  ${Math.floor(pct()*100)}%` + (pct()>=0.9 ? ' ★' : '') + (pct()>=1 ? '★' : ''), 4, 4);
+    label(`${cur.id}  ${Math.floor(pct()*100)}%` + (starsFor(pct()) ? ' ' + '★'.repeat(starsFor(pct())) : ''), 4, 4);
     label(fmt(ticks/30), cv.width-66, 4);
     if (won) label(mobile ? 'LEVEL CLEAR  Tap: next' : 'LEVEL CLEAR  Enter: next  R: retry  P: menu', 4, 26);
     if (toast && performance.now() < toast.until) label(toast.t, 4, 48);
