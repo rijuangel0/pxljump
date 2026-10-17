@@ -496,6 +496,7 @@ cv.addEventListener('wheel', e => {
 }, {passive:false});
 
 // ================= GAME LOGIC =================
+// Side walls are solid; above and below the map is open air.
 const tile = (x, y) => (x < 0 || x >= w) ? 7 : (y < 0 || y >= h) ? 0 : map[y][x];
 function blocked(px, py) {
   for (let j = 0; j < PLH; j++) for (let i = 0; i < PLW; i++)
@@ -670,4 +671,4 @@ function draw() {
   }
   requestAnimationFrame(draw);
 }
-</script>
+   </script>
