@@ -16,7 +16,6 @@ const PGW = 20, PGH = 10;              // page size (view shifts in these steps)
 const PLW = 2, PLH = 3;                // player size
 const CLEAR = 0.5;                     // fraction of coins needed to clear a level
 const STAR_AT = [0.75, 0.9, 1];        // coin fractions for 1, 2 and 3 stars
-const CEIL = 0;                        // top rows of the map the player can't enter
 const starsFor = f => STAR_AT.filter(t => f >= t).length;
 const COLORS = ['#000','#00f','#0f0','#0ff','#f00','#a0f','#ff0','#fff'];
 const cv = document.getElementById('c'), ctx = cv.getContext('2d');
