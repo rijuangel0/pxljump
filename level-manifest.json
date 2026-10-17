@@ -124,5 +124,47 @@
       "number": 10,
       "path": "levels/1-3-10.png"
     }
+  ],
+  "1-4": [
+    {
+      "number": 1,
+      "path": "levels/1-4-1.png"
+    },
+    {
+      "number": 2,
+      "path": "levels/1-4-2.png"
+    },
+    {
+      "number": 3,
+      "path": "levels/1-4-3.png"
+    },
+    {
+      "number": 4,
+      "path": "levels/1-4-4.png"
+    },
+    {
+      "number": 5,
+      "path": "levels/1-4-5.png"
+    },
+    {
+      "number": 6,
+      "path": "levels/1-4-6.png"
+    },
+    {
+      "number": 7,
+      "path": "levels/1-4-7.png"
+    },
+    {
+      "number": 8,
+      "path": "levels/1-4-8.png"
+    },
+    {
+      "number": 9,
+      "path": "levels/1-4-9.png"
+    },
+    {
+      "number": 10,
+      "path": "levels/1-4-10.png"
+    }
   ]
 }

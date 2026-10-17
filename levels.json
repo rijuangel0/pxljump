@@ -1,14 +1,27 @@
 {
-  "musicUnlocks": [0, 10, 25, 45],
+  "musicUnlocks": [
+    0,
+    10,
+    25,
+    45
+  ],
   "levelDirectory": "levels/",
   "lands": [
     {
       "name": "Land 1",
       "areas": [
-        { "name": "Area 1" },
-        { "name": "Area 2" },
-        { "name": "Area 3" },
-        { "name": "Area 4" }
+        {
+          "name": "Area 1"
+        },
+        {
+          "name": "Area 2"
+        },
+        {
+          "name": "Area 3"
+        },
+        {
+          "name": "Area 4"
+        }
       ]
     }
   ]
