@@ -496,7 +496,7 @@ cv.addEventListener('wheel', e => {
 }, {passive:false});
 
 // ================= GAME LOGIC =================
-const tile = (x, y) => (x < 0 || x >= w || y < CEIL) ? 7 : (y >= h ? 0 : map[y][x]);
+const tile = (x, y) => (x < 0 || x >= w) ? 7 : (y < 0 || y >= h) ? 0 : map[y][x];
 function blocked(px, py) {
   for (let j = 0; j < PLH; j++) for (let i = 0; i < PLW; i++)
     if (tile(px+i, py+j) === 7) return true;
@@ -533,7 +533,7 @@ function tick() {
 }
 
 function interact() {
-  if (p.y >= h) { respawn(); return; }
+  if (p.y >= h) { p.y = -PLH; return; }   // fall out the bottom, drop in from the top
   for (let j = 0; j < PLH; j++) for (let i = 0; i < PLW; i++) {
     const x = p.x+i, y = p.y+j, v = tile(x, y);
     if (v === 4) { respawn(); return; }
