@@ -1,9 +1,9 @@
 {
   "musicUnlocks": [
     0,
-    10,
-    25,
-    45
+    15,
+    30,
+    60
   ],
   "levelDirectory": "levels/",
   "lands": [
