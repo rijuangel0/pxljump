@@ -92,15 +92,21 @@ const TRACKS = [
   { name:'Pixel Hop',  unlock:0,  bpm:120,
     lead:[72,76,79,76, 72,76,79,84, 83,79,76,79, 77,74,71,0],
     bass:[48,0,48,0, 53,0,53,0, 55,0,55,0, 48,0,48,0] },
-  { name:'Night Run',  unlock:10, bpm:100,
+  { name:'Night Run',  unlock:15, bpm:100,
     lead:[69,0,72,0, 76,0,72,0, 71,0,74,0, 77,0,74,0],
     bass:[45,0,45,0, 45,0,45,0, 41,0,41,0, 43,0,43,0] },
-  { name:'Coin Rush',  unlock:25, bpm:150,
+  { name:'Coin Rush',  unlock:30, bpm:150,
     lead:[67,71,74,79, 67,71,74,79, 69,72,76,81, 69,72,76,81],
     bass:[43,0,43,0, 43,0,43,0, 45,0,45,0, 45,0,45,0] },
-  { name:'Final Gate', unlock:45, bpm:130,
+  { name:'Final Gate', unlock:60, bpm:130,
     lead:[74,0,77,0, 81,0,77,0, 72,0,76,0, 79,0,76,0],
-    bass:[38,0,38,0, 38,0,38,0, 36,0,36,0, 36,0,36,0] }
+    bass:[38,0,38,0, 38,0,38,0, 36,0,36,0, 36,0,36,0] },
+  { name:'Sky Drift',  unlock:90, bpm:110,
+    lead:[84,0,81,0, 79,0,76,0, 77,0,79,0, 81,0,79,0],
+    bass:[48,0,0,0, 48,0,0,0, 53,0,0,0, 55,0,0,0] },
+  { name:'Lava Dash',  unlock:120, bpm:170,
+    lead:[69,72,69,76, 69,72,69,77, 67,71,67,74, 68,71,68,75],
+    bass:[45,45,0,45, 45,45,0,45, 43,43,0,43, 44,44,0,44] }
 ];
 // song prices (the old unlock stars) and purchases
 const price = i => world?.musicUnlocks?.[i] ?? TRACKS[i].unlock;
@@ -235,7 +241,7 @@ function menuButtons() {
       const has = owned(i), can = balance() >= price(i);
       out.push({
         label: has ? (mIdx === i ? 'Playing' : 'Play') : (can ? 'Buy ' + price(i) + '★' : price(i) + '★'),
-        act: () => shopAct(i), x:450, y:44+i*50, w:160, h:32, dim: !has && !can });
+        act: () => shopAct(i), x:450, y:36+i*38, w:160, h:28, dim: !has && !can });
     });
   }
   if (menu.tab === 2) {
@@ -618,10 +624,10 @@ function drawLevelsTab() {
 
 function drawShopTab() {
   TRACKS.forEach((t, i) => {
-    const y = 44 + i*50;
-    if (menu.shopSel === i) { ctx.fillStyle = '#333'; ctx.fillRect(16, y-4, 608, 40); }
-    ctx.fillStyle = '#fff'; ctx.font = '14px monospace'; ctx.fillText(t.name, 28, y+14);
-    ctx.fillStyle = '#aaa'; ctx.font = '12px monospace'; ctx.fillText(owned(i) ? 'Owned' : 'Price: ' + price(i) + '★', 28, y+30);
+    const y = 36 + i*38;
+    if (menu.shopSel === i) { ctx.fillStyle = '#333'; ctx.fillRect(16, y-4, 608, 36); }
+    ctx.fillStyle = '#fff'; ctx.font = '14px monospace'; ctx.fillText(t.name, 28, y+12);
+    ctx.fillStyle = '#aaa'; ctx.font = '12px monospace'; ctx.fillText(owned(i) ? 'Owned' : 'Price: ' + price(i) + '★', 28, y+26);
   });
   ctx.fillStyle = '#fff'; ctx.font = '12px monospace';
   ctx.fillText('Cumulative: ' + stars() + '★   Spent: ' + spent() + '★   Balance: ' + balance() + '★', 28, 266);

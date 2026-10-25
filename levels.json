@@ -3,7 +3,9 @@
     0,
     15,
     30,
-    60
+    60,
+    90,
+    120
   ],
   "levelDirectory": "levels/",
   "lands": [

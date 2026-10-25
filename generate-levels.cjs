@@ -10,7 +10,7 @@ const NAME = /^(\d+)-(\d+)-(\d+)\.png$/i;          // LAND-AREA-LEVEL.png
 
 function readConfig() {
   if (!fs.existsSync(CONFIG))
-    return {musicUnlocks:[0,10,25,45], levelDirectory:'levels/', lands:[]};
+    return {musicUnlocks:[0,15,30,60,90,120], levelDirectory:'levels/', lands:[]};
   return JSON.parse(fs.readFileSync(CONFIG, 'utf8'));   // throws on bad JSON so nothing gets overwritten
 }
 const levelDir = config => (config.levelDirectory || 'levels/').replace(/\\/g, '/').replace(/\/?$/, '/');
