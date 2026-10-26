@@ -98,10 +98,10 @@ footer{margin-top:40px;color:var(--mut);font-size:12px}
    Leave them empty to try the page in demo mode.
    ===================================================================== */
 const CONFIG = {
-  SUPABASE_URL: 'https://modzizogfpjdgaucmmmr.supabase.co',
-  SUPABASE_ANON_KEY: 'sb_publishable_yVj2Nn2A2dufU5rNXbqstw_1tiWqo63',
+  SUPABASE_URL: '',        // e.g. 'https://abcdxyz.supabase.co'
+  SUPABASE_ANON_KEY: '',   // the public "anon" key (safe to publish; row-level security protects the data)
   GAME_PATH: '../',        // folder holding levels.json + level-manifest.json, relative to this page
-  VERSIONS: ['Update v1.7.1'], //do list of versions here, in order, for the version dropdown in the submit form
+  VERSIONS: [],            // optional suggestions for the Version field, newest first, e.g. ['1.2','1.1']
 };
 const DEMO = !CONFIG.SUPABASE_URL || !CONFIG.SUPABASE_ANON_KEY;
 
@@ -400,8 +400,8 @@ function bulkView() {
   app.innerHTML = `<h1 class="page">Bulk submit</h1>
   <p class="mut" style="margin-top:-6px">Send many runs with one proof link. Leave a box empty to skip it. Nothing goes public until a moderator approves it.</p>
   <div class="panel"><b>Fill from your game save</b>
-    <div class="mut" style="font-size:13px;margin:2px 0 8px">In the game open the menu, go to Settings and press Export, then paste the code here. Only your times are read, and nothing is sent until you press Submit.</div>
-    <textarea id="code" rows="2" placeholder="Paste save code…" style="width:100%"></textarea>
+    <div class="mut" style="font-size:13px;margin:2px 0 8px">In the game open the menu, go to Settings and press Copy times (the Export code works too), then paste it here. Only your times are read, and nothing is sent until you press Submit.</div>
+    <textarea id="code" rows="2" placeholder="Paste your times…" style="width:100%"></textarea>
     <div style="margin-top:8px"><button type="button" id="load">Load times</button> <span id="lmsg" class="mut"></span></div></div>
   <form id="bf" autocomplete="off" novalidate>
     <div class="grid">
@@ -448,7 +448,11 @@ function bulkView() {
   $('#bkeep').onclick = () => { inputs().forEach(i => { const cs = parseT(i.value), w = wr(i.dataset.cat); if (i.value.trim() && w && !(cs && cs < w.cs)) { i.value = ''; mark(i); } }); count(); };
   $('#load').onclick = () => {
     const m = $('#lmsg'); m.className = 'err';
-    let d; try { d = JSON.parse(atob($('#code').value.trim())); if (!d || typeof d.times !== 'object') throw 0; } catch { m.textContent = 'That save code isn’t valid.'; return; }
+    let d; try {
+      const txt = $('#code').value.trim();
+      d = JSON.parse(txt[0] === '{' ? txt : atob(txt));   // "Copy times" JSON, or the base64 save code from Export
+      if (!d || typeof d.times !== 'object' || d.times === null) throw 0;
+    } catch { m.textContent = 'That code isn’t valid. Use Copy times or Export in the game’s Settings.'; return; }
     let used = 0, skipped = 0;
     for (const [id, t] of Object.entries(d.times)) {
       const inp = /^\d+-\d+-\d+$/.test(id) && typeof t === 'number' && t > 0 && t < 1e6 ? at(id) : null;

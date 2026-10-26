@@ -172,6 +172,15 @@ function exportSave() {
   navigator.clipboard?.writeText(code).catch(() => {});
   prompt('Your save code (copied if your browser allows):', code);
 }
+// Just the times, as plain JSON, for pasting into the WR site's Bulk page.
+function exportTimes() {
+  const ids = Object.keys(times).sort((a, b) => { const x = a.split('-').map(Number), y = b.split('-').map(Number); return x[0]-y[0] || x[1]-y[1] || x[2]-y[2]; });
+  if (!ids.length) return alert('You have no times to copy yet.');
+  const out = {}; for (const id of ids) out[id] = times[id];
+  const json = JSON.stringify({game:'pxljump', v:1, times:out});
+  navigator.clipboard?.writeText(json).catch(() => {});
+  prompt('Your times (copied if your browser allows). Paste them into the Bulk page on the WR site:', json);
+}
 function importSave() {
   const code = prompt('Paste your save code:');
   if (!code) return;
@@ -254,6 +263,7 @@ function menuButtons() {
       ['Mode: ' + (mobile ? 'Mobile' : 'PC'), act.mode],
       ['Defaults', act.defaults],
       ['Export', exportSave],
+      ['Copy times', exportTimes],
       ['Import', importSave],
       ['Reset times', act.rtimes],
       ['Reset game', act.rgame]);
@@ -275,6 +285,7 @@ function menuTap(q) {
 }
 function menuKey(k) {
   if (k === 'e') return exportSave();
+  if (k === 'x') return exportTimes();
   if (k === 'i') return importSave();
   if (k === 'm') return act.music();
   if (k === 'c') return act.mode();
