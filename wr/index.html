@@ -39,14 +39,17 @@ tr.sel td{background:var(--card)}
 @media(max-width:420px){.grid{grid-template-columns:1fr}}
 label{display:flex;flex-direction:column;gap:3px;font-size:13px;color:var(--mut)}
 label small{font-size:12px}
-input,select{font:inherit;color:var(--fg);background:var(--bg);border:1px solid var(--line);border-radius:5px;padding:7px 9px;min-width:0}
-input:focus,select:focus{outline:2px solid var(--acc);outline-offset:-1px}
+input,select,textarea{font:inherit;color:var(--fg);background:var(--bg);border:1px solid var(--line);border-radius:5px;padding:7px 9px;min-width:0}
+input:focus,select:focus,textarea:focus{outline:2px solid var(--acc);outline-offset:-1px}
 button,.btn{font:inherit;cursor:pointer;color:var(--bg);background:var(--fg);border:0;border-radius:5px;padding:7px 14px;display:inline-block}
 button:disabled{opacity:.5;cursor:default}
 .btn:hover{text-decoration:none;opacity:.85}
 button.sm{padding:2px 8px;font-size:12px;margin-right:4px}
 button.ghost{background:none;color:var(--fg);border:1px solid var(--line)}
 button.danger{background:var(--bad);color:#fff}
+input[type=checkbox]{padding:0;width:16px;height:16px}
+tr.grp td{background:var(--card);border-top:2px solid var(--line)}
+.sticky{position:sticky;bottom:0;background:var(--bg);border-top:1px solid var(--line);padding:10px 0;margin-top:16px;display:flex;flex-wrap:wrap;align-items:center;gap:10px}
 .hp{position:absolute;left:-9999px;width:1px;height:1px;opacity:0}
 .tabs{display:flex;gap:6px;margin:0 0 12px}
 .tabs button{background:none;color:var(--mut);border:1px solid var(--line)}
@@ -67,6 +70,7 @@ footer{margin-top:40px;color:var(--mut);font-size:12px}
     <a href="#/levels" data-v="levels">Levels</a>
     <a href="#/players" data-v="players">Players</a>
     <a href="#/submit" data-v="submit">Submit</a>
+    <a href="#/bulk" data-v="bulk">Bulk</a>
     <a href="#/admin" data-v="admin">Admin<span id="badge"></span></a>
   </nav>
 </header>
@@ -97,7 +101,7 @@ const CONFIG = {
   SUPABASE_URL: 'https://modzizogfpjdgaucmmmr.supabase.co',
   SUPABASE_ANON_KEY: 'sb_publishable_yVj2Nn2A2dufU5rNXbqstw_1tiWqo63',
   GAME_PATH: '../',        // folder holding levels.json + level-manifest.json, relative to this page
-  VERSIONS: ['Release v1.7.01'], // type new v.s here each update
+  VERSIONS: ['Update v1.7.1'], //do list of versions here, in order, for the version dropdown in the submit form
 };
 const DEMO = !CONFIG.SUPABASE_URL || !CONFIG.SUPABASE_ANON_KEY;
 
@@ -120,7 +124,7 @@ const nat = (a, b) => { const x = a.split('-').map(Number), y = b.split('-').map
 const cmpRun = (a, b) => a.run_date !== b.run_date ? (a.run_date < b.run_date ? -1 : 1) : a.created_at !== b.created_at ? (a.created_at < b.created_at ? -1 : 1) : a.id - b.id;
 const proofLink = u => /^https?:\/\//i.test(u) ? `<a href="${esc(u)}" target="_blank" rel="noopener noreferrer nofollow">proof ↗</a>` : '—';
 const playerLink = n => `<a href="#/players/${encodeURIComponent(n)}">${esc(n)}</a>`;
-const nm = (p, n, name) => name && name !== `${p} ${n}` ? `${p} ${n} — ${name}` : `${p} ${n}`;
+const nm = (p, n, name) => name && !new RegExp('^' + p + ' \\d+$').test(name) ? `${p} ${n} — ${name}` : `${p} ${n}`;   // generic names like “Area 1” aren’t repeated
 const KIND = {lands: 'land', areas: 'area', levels: 'level'};
 
 /* ---------- API (Supabase REST, or a localStorage demo) ---------- */
@@ -145,8 +149,9 @@ async function req(method, path, {body, auth, prefer, range} = {}) {
       catch { session = null; sessionStorage.removeItem('wr_session'); throw new Error('Session expired, please log in again'); }
     }
   }
-  const headers = {apikey: CONFIG.SUPABASE_ANON_KEY, 'Content-Type': 'application/json',
-    Authorization: 'Bearer ' + (auth ? session.access_token : CONFIG.SUPABASE_ANON_KEY)};
+  const headers = {apikey: CONFIG.SUPABASE_ANON_KEY, 'Content-Type': 'application/json'};
+  if (auth) headers.Authorization = 'Bearer ' + session.access_token;
+  else if (CONFIG.SUPABASE_ANON_KEY.startsWith('eyJ')) headers.Authorization = 'Bearer ' + CONFIG.SUPABASE_ANON_KEY;   // legacy anon JWT; new sb_publishable_ keys go in apikey only
   if (prefer) headers.Prefer = prefer;
   if (range) { headers['Range-Unit'] = 'items'; headers.Range = range; }
   const res = await fetch(CONFIG.SUPABASE_URL + path, {method, headers, body: body ? JSON.stringify(body) : undefined});
@@ -185,22 +190,26 @@ const demo = {
 };
 const api = DEMO ? {
   approved: async () => demo.load().filter(r => r.status === 'approved'),
-  submit: async row => { const a = demo.load(); a.push({...row, id: Date.now(), status: 'pending', note: null, created_at: new Date().toISOString(), reviewed_at: null}); demo.save(a); },
+  submit: async rows => { const a = demo.load(); [].concat(rows).forEach((row, i) => a.push({...row, id: Date.now() + i, status: 'pending', note: null, created_at: new Date().toISOString(), reviewed_at: null})); demo.save(a); },
   loggedIn: () => sessionStorage.getItem('wr_demo_admin') === '1',
   login: async (e, p) => { if (p !== 'demo') throw new Error('The demo password is “demo”'); sessionStorage.setItem('wr_demo_admin', '1'); },
   logout: () => sessionStorage.removeItem('wr_demo_admin'),
   all: async () => demo.load(),
   update: async (id, p) => { const a = demo.load(), r = a.find(x => x.id === id); if (r) Object.assign(r, p); demo.save(a); },
   remove: async id => demo.save(demo.load().filter(r => r.id !== id)),
+  updateMany: async (ids, p) => { const a = demo.load(); for (const r of a) if (ids.includes(r.id)) Object.assign(r, p); demo.save(a); },
+  removeMany: async ids => demo.save(demo.load().filter(r => !ids.includes(r.id))),
 } : {
   approved: () => fetchAll('select=*&status=eq.approved&order=id.asc'),
-  submit: row => req('POST', '/rest/v1/runs', {body: row, prefer: 'return=minimal'}),
+  submit: rows => req('POST', '/rest/v1/runs', {body: rows, prefer: 'return=minimal'}),   // one row or an array
   loggedIn: () => !!session,
   login: (email, password) => authCall('password', {email, password}),
   logout: () => { session = null; sessionStorage.removeItem('wr_session'); },
   all: () => fetchAll('select=*&order=id.asc', true),
   update: (id, p) => req('PATCH', `/rest/v1/runs?id=eq.${Number(id)}`, {body: p, auth: true, prefer: 'return=minimal'}),
   remove: id => req('DELETE', `/rest/v1/runs?id=eq.${Number(id)}`, {auth: true}),
+  updateMany: (ids, p) => req('PATCH', `/rest/v1/runs?id=in.(${ids.map(Number).join(',')})`, {body: p, auth: true, prefer: 'return=minimal'}),
+  removeMany: ids => req('DELETE', `/rest/v1/runs?id=in.(${ids.map(Number).join(',')})`, {auth: true}),
 };
 
 /* ---------- game structure (lands / areas / levels) ---------- */
@@ -322,6 +331,7 @@ function submitView(pre) {
   const pp = (pre || '').split('-').map(Number);
   const saved = {name: localStorage.getItem('wr_name') || '', version: localStorage.getItem('wr_version') || CONFIG.VERSIONS[0] || ''};
   app.innerHTML = `<h1 class="page">Submit a run</h1>
+  <p class="mut" style="margin-top:-6px">Have lots of times to send? <a href="#/bulk">Use bulk submit →</a></p>
   <form id="f" class="grid" autocomplete="off" novalidate>
     <label>Land<select name="land"></select></label>
     <label>Area<select name="area"></select></label>
@@ -352,19 +362,125 @@ function submitView(pre) {
     e.preventDefault();
     const msg = $('#msg'); msg.className = 'err';
     if (f.hp.value) { msg.className = 'ok'; msg.textContent = 'Submitted.'; return; }   // bots land here
-    const wait = 30000 - (Date.now() - +(localStorage.getItem('wr_last') || 0));
-    if (wait > 0) { msg.textContent = `Please wait ${Math.ceil(wait / 1000)}s before submitting again.`; return; }
     const v = validate({cat: [f.land.value, f.area.value, f.level.value].filter(Boolean).join('-'), name: f.name.value, time: f.time.value, date: f.date.value, version: f.version.value, proof: f.proof.value});
     if (v.error) { msg.textContent = v.error; return; }
     $('#go').disabled = true; msg.className = 'mut'; msg.textContent = 'Sending…';
     try {
       await api.submit(v.row);
-      localStorage.setItem('wr_name', v.row.name); localStorage.setItem('wr_version', v.row.version); localStorage.setItem('wr_last', Date.now());
-      f.time.value = ''; f.proof.value = '';
-      msg.className = 'ok'; msg.textContent = 'Submitted! A moderator will review it before it appears.';
+      localStorage.setItem('wr_name', v.row.name); localStorage.setItem('wr_version', v.row.version);
+      f.time.value = '';   // proof stays filled in, handy when one video covers many levels
+      let next = '';
+      if (f.level.value) {   // step to the next level in this area so runs can be entered back to back
+        const o = [...f.level.options].map(x => x.value).filter(Boolean), i = o.indexOf(f.level.value);
+        if (i >= 0 && i < o.length - 1) { f.level.value = o[i + 1]; info(); next = ` Moved on to level ${o[i + 1]}.`; }
+        else next = ' That was the last level in this area.';
+      }
+      msg.className = 'ok'; msg.textContent = 'Submitted! A moderator will review it before it appears.' + next;
+      f.time.focus();
     } catch (err) { msg.className = 'err'; msg.textContent = 'Couldn’t submit: ' + err.message; }
     $('#go').disabled = false;
   };
+}
+
+/* ---------- bulk submit ---------- */
+function bulkView() {
+  const saved = {name: localStorage.getItem('wr_name') || '', version: localStorage.getItem('wr_version') || CONFIG.VERSIONS[0] || ''};
+  const raw = {};   // exact seconds from a save code, so totals match the game
+  const row = (k, title, strong) => `<tr><td${strong ? ' style="font-weight:600"' : ''}>${title}</td><td><input class="ti" data-cat="${k}" inputmode="decimal" placeholder="m:ss.cc" autocomplete="off" style="width:110px"></td>
+    <td class="t mut">${wr(k) ? fmtT(wr(k).cs) : '—'}</td><td class="t" data-mk="${k}"></td></tr>`;
+  const head = t => `<h2>${t}</h2><div class="scroll"><table><thead><tr><th>Run</th><th>Your time</th><th>Current WR</th><th></th></tr></thead><tbody>`;
+  let body = '';
+  for (const L of STRUCT) {
+    for (const A of L.areas) {
+      const ak = L.n + '-' + A.n;
+      body += head(esc(nm('Area', ak, A.name))) + A.levels.map(n => row(ak + '-' + n, 'Level ' + n)).join('') + row(ak, 'Area total', true) + '</tbody></table></div>';
+    }
+    body += head(esc(nm('Land', L.n, L.name))) + row(String(L.n), 'Land total', true) + '</tbody></table></div>';
+  }
+  app.innerHTML = `<h1 class="page">Bulk submit</h1>
+  <p class="mut" style="margin-top:-6px">Send many runs with one proof link. Leave a box empty to skip it. Nothing goes public until a moderator approves it.</p>
+  <div class="panel"><b>Fill from your game save</b>
+    <div class="mut" style="font-size:13px;margin:2px 0 8px">In the game open the menu, go to Settings and press Export, then paste the code here. Only your times are read, and nothing is sent until you press Submit.</div>
+    <textarea id="code" rows="2" placeholder="Paste save code…" style="width:100%"></textarea>
+    <div style="margin-top:8px"><button type="button" id="load">Load times</button> <span id="lmsg" class="mut"></span></div></div>
+  <form id="bf" autocomplete="off" novalidate>
+    <div class="grid">
+      <label>Name<input name="name" maxlength="24" value="${esc(saved.name)}"></label>
+      <label>Date<input name="date" type="date" value="${today()}" max="${today()}"></label>
+      <label>Version<input name="version" maxlength="20" list="vers" value="${esc(saved.version)}" placeholder="1.0"></label>
+      <label class="wide">Proof<small>One Discord message link or image link covering these runs</small><input name="proof" inputmode="url" placeholder="https://"></label>
+    </div>
+    <div style="margin:14px 0 0;display:flex;flex-wrap:wrap;gap:8px">
+      <button type="button" class="ghost" id="btot">Calculate totals</button>
+      <button type="button" class="ghost" id="bkeep">Keep only new records</button>
+      <button type="button" class="ghost" id="bclr">Clear all</button></div>
+    ${body}
+    <div class="sticky"><span id="bcount" class="mut"></span><button id="bgo">Submit</button><span id="bmsg"></span></div>
+  </form><datalist id="vers">${CONFIG.VERSIONS.map(v => `<option value="${esc(v)}">`).join('')}</datalist>`;
+  const bf = $('#bf'), inputs = () => [...app.querySelectorAll('.ti')], at = k => app.querySelector(`.ti[data-cat="${k}"]`);
+  function mark(inp) {
+    const k = inp.dataset.cat, cell = app.querySelector(`[data-mk="${k}"]`), v = inp.value.trim(), w = wr(k);
+    cell.textContent = ''; cell.className = 't'; inp.style.outline = '';
+    if (!v) return;
+    const cs = parseT(v);
+    if (!cs) { cell.textContent = 'invalid'; cell.className = 't err'; return; }
+    if (!w) { cell.textContent = 'first record'; cell.className = 't ok'; }
+    else if (cs < w.cs) { cell.textContent = 'new WR ' + fmtChange(cs - w.cs); cell.className = 't ok'; }
+    else { cell.textContent = cs === w.cs ? 'ties WR' : fmtChange(cs - w.cs) + ' off WR'; cell.className = 't mut'; }
+  }
+  const count = () => { const n = inputs().filter(i => i.value.trim()).length; $('#bcount').textContent = n + ' run' + (n === 1 ? '' : 's') + ' ready'; $('#bgo').disabled = !n; };
+  const secs = k => { const i = at(k); if (!i || !i.value.trim()) return null; const cs = parseT(i.value); return cs ? (raw[k] ?? cs / 100) : null; };
+  function totals() {   // area / land totals from level times, only when every level is filled in
+    for (const L of STRUCT) {
+      let land = 0, landOk = true, any = false;
+      for (const A of L.areas) {
+        const ak = L.n + '-' + A.n; let sum = 0, ok = A.levels.length > 0;
+        for (const n of A.levels) { const t = secs(ak + '-' + n); if (t === null) ok = false; else sum += t; }
+        if (ok) { const i = at(ak); i.value = fmtT(Math.round(+sum.toFixed(2) * 100)); mark(i); land += sum; any = true; } else landOk = false;
+      }
+      if (landOk && any) { const i = at(String(L.n)); i.value = fmtT(Math.round(+land.toFixed(2) * 100)); mark(i); }
+    }
+    count();
+  }
+  bf.addEventListener('input', e => { if (e.target.classList.contains('ti')) { delete raw[e.target.dataset.cat]; mark(e.target); count(); } });
+  $('#btot').onclick = totals;
+  $('#bclr').onclick = () => { inputs().forEach(i => { i.value = ''; mark(i); }); for (const k in raw) delete raw[k]; count(); };
+  $('#bkeep').onclick = () => { inputs().forEach(i => { const cs = parseT(i.value), w = wr(i.dataset.cat); if (i.value.trim() && w && !(cs && cs < w.cs)) { i.value = ''; mark(i); } }); count(); };
+  $('#load').onclick = () => {
+    const m = $('#lmsg'); m.className = 'err';
+    let d; try { d = JSON.parse(atob($('#code').value.trim())); if (!d || typeof d.times !== 'object') throw 0; } catch { m.textContent = 'That save code isn’t valid.'; return; }
+    let used = 0, skipped = 0;
+    for (const [id, t] of Object.entries(d.times)) {
+      const inp = /^\d+-\d+-\d+$/.test(id) && typeof t === 'number' && t > 0 && t < 1e6 ? at(id) : null;
+      if (!inp) { skipped++; continue; }
+      raw[id] = t; inp.value = fmtT(Math.round(+t.toFixed(2) * 100)); mark(inp); used++;
+    }
+    totals();
+    m.className = used ? 'ok' : 'err'; m.textContent = used ? `Loaded ${used} level time${used === 1 ? '' : 's'}${skipped ? ` (${skipped} skipped)` : ''}. Check them, then submit.` : 'No level times found in that code.';
+  };
+  bf.onsubmit = async e => {
+    e.preventDefault(); const msg = $('#bmsg'); msg.className = 'err'; msg.textContent = '';
+    const filled = inputs().filter(i => i.value.trim()); if (!filled.length) return;
+    const shared = {name: bf.name.value, date: bf.date.value, version: bf.version.value, proof: bf.proof.value};
+    const sv = validate({...shared, cat: '1', time: '1:00'}); if (sv.error) { msg.textContent = sv.error; return; }
+    const rows = [];
+    for (const i of filled) {
+      const v = validate({...shared, cat: i.dataset.cat, time: i.value});
+      if (v.error) { i.focus(); i.style.outline = '2px solid var(--bad)'; msg.textContent = label(i.dataset.cat) + ': ' + v.error; return; }
+      rows.push(v.row);
+    }
+    if (rows.length > 200) { msg.textContent = 'Too many runs at once (max 200).'; return; }
+    if (!confirm(`Submit ${rows.length} run${rows.length === 1 ? '' : 's'} for review?`)) return;
+    $('#bgo').disabled = true; msg.className = 'mut'; msg.textContent = 'Sending…';
+    try {
+      await api.submit(rows);
+      localStorage.setItem('wr_name', rows[0].name); localStorage.setItem('wr_version', rows[0].version);
+      inputs().forEach(i => { i.value = ''; mark(i); }); for (const k in raw) delete raw[k];
+      msg.className = 'ok'; msg.textContent = `Submitted ${rows.length} run${rows.length === 1 ? '' : 's'}! A moderator will review them before they appear.`;
+    } catch (err) { msg.className = 'err'; msg.textContent = 'Couldn’t submit: ' + err.message; }
+    count();
+  };
+  count();
 }
 
 /* ---------- admin ---------- */
@@ -393,30 +509,68 @@ function impact(r) {
   if (r.cs < w.cs) return `<span class="ok">new WR ${fmtChange(r.cs - w.cs)}</span>`;
   return r.cs === w.cs ? 'ties WR' : `<span class="mut">${fmtChange(r.cs - w.cs)} off WR</span>`;
 }
+let sel = new Set(), groups = [];
+const beats = r => { const w = wr(key(r)); return !w || r.cs < w.cs; };
+const tabRows = () => adminRows.filter(r => r.status === adminTab);
+const selIds = () => tabRows().filter(r => sel.has(r.id)).map(r => r.id);
+function updSel() {
+  const n = selIds().length, c = $('#scount'); if (c) c.textContent = n + ' selected';
+  app.querySelectorAll('[data-act^="b"]').forEach(b => b.disabled = !n);
+}
 function renderAdmin() {
   const n = s => adminRows.filter(r => r.status === s).length;
-  const rows = adminRows.filter(r => r.status === adminTab).sort((a, b) => adminTab === 'pending' ? cmpRun(a, b) : cmpRun(b, a));
+  const lc = x => x.name.toLowerCase(), cmp = (a, b) => a < b ? -1 : a > b ? 1 : 0;
+  const rows = tabRows().sort((a, b) => adminTab === 'pending' ? cmp(lc(a), lc(b)) || cmp(a.proof, b.proof) || nat(key(a), key(b)) : cmpRun(b, a));
   const btn = (act, id, t, c = '') => `<button class="sm ${c}" data-act="${act}" data-id="${id}">${t}</button>`;
+  groups = [];
+  let body = '', last = null;
+  for (const r of rows) {
+    if (adminTab === 'pending') {
+      const g = lc(r) + '\n' + r.proof;
+      if (g !== last) {
+        last = g; const ms = rows.filter(x => lc(x) + '\n' + x.proof === g), w = ms.filter(beats).length;
+        groups.push(ms.map(x => x.id));
+        body += `<tr class="grp"><td colspan="9"><b>${esc(r.name)}</b> · ${proofLink(r.proof)} · ${ms.length} run${ms.length === 1 ? '' : 's'} · <span class="${w ? 'ok' : 'mut'}">${w} new record${w === 1 ? '' : 's'}</span> ${btn('grp', groups.length - 1, 'Select group', 'ghost')}</td></tr>`;
+      }
+    }
+    body += `<tr><td><input type="checkbox" data-sel="${r.id}" ${sel.has(r.id) ? 'checked' : ''}></td><td>${label(key(r))}</td><td>${esc(r.name)}</td><td class="t">${fmtT(r.cs)}</td><td class="t">${r.run_date}</td><td>${esc(r.version)}</td><td>${proofLink(r.proof)}</td>
+      <td>${adminTab === 'pending' ? impact(r) : adminTab === 'rejected' ? `<span class="mut">${esc(r.note || '')}</span>` : ''}<div class="mut" style="font-size:12px">sent ${String(r.created_at).slice(0, 10)}</div></td>
+      <td style="white-space:nowrap">${adminTab !== 'approved' ? btn('approve', r.id, 'Approve') : ''}${adminTab === 'pending' ? btn('reject', r.id, 'Reject', 'ghost') : ''}${adminTab !== 'pending' ? btn('pending', r.id, 'Unreview', 'ghost') : ''}${btn('edit', r.id, 'Edit', 'ghost')}${btn('delete', r.id, 'Delete', 'danger')}</td></tr>`;
+  }
+  const bar = `<div class="bar panel" style="margin:0 0 8px"><span id="scount" class="mut">0 selected</span><span>${adminTab !== 'approved' ? btn('bapprove', '', 'Approve') : ''}${adminTab === 'pending' ? btn('breject', '', 'Reject', 'ghost') : ''}${adminTab !== 'pending' ? btn('bpending', '', 'Unreview', 'ghost') : ''}${btn('bdelete', '', 'Delete', 'danger')}</span></div>`;
   app.innerHTML = `<div class="bar"><h1 class="page" style="margin:0">Admin</h1><button class="ghost sm" data-act="logout">Log out</button></div>
   <div class="tabs" style="margin-top:12px">${['pending', 'approved', 'rejected'].map(s => `<button class="${s === adminTab ? 'on' : ''}" data-tab="${s}">${s} (${n(s)})</button>`).join('')}</div>` +
-  (rows.length ? '<div class="scroll"><table><thead><tr><th>Category</th><th>Player</th><th>Time</th><th>Date</th><th>Ver.</th><th>Proof</th><th>Info</th><th></th></tr></thead><tbody>' +
-    rows.map(r => `<tr><td>${label(key(r))}</td><td>${esc(r.name)}</td><td class="t">${fmtT(r.cs)}</td><td class="t">${r.run_date}</td><td>${esc(r.version)}</td><td>${proofLink(r.proof)}</td>
-      <td>${adminTab === 'pending' ? impact(r) : adminTab === 'rejected' ? `<span class="mut">${esc(r.note || '')}</span>` : ''}<div class="mut" style="font-size:12px">sent ${String(r.created_at).slice(0, 10)}</div></td>
-      <td style="white-space:nowrap">${adminTab !== 'approved' ? btn('approve', r.id, 'Approve') : ''}${adminTab === 'pending' ? btn('reject', r.id, 'Reject', 'ghost') : ''}${adminTab !== 'pending' ? btn('pending', r.id, 'Unreview', 'ghost') : ''}${btn('edit', r.id, 'Edit', 'ghost')}${btn('delete', r.id, 'Delete', 'danger')}</td></tr>`).join('') + '</tbody></table></div>'
+  (rows.length ? bar + `<div class="scroll"><table><thead><tr><th><input type="checkbox" data-selall ${rows.every(r => sel.has(r.id)) ? 'checked' : ''}></th><th>Category</th><th>Player</th><th>Time</th><th>Date</th><th>Ver.</th><th>Proof</th><th>Info</th><th></th></tr></thead><tbody>${body}</tbody></table></div>`
     : `<p class="mut">Nothing ${adminTab}.</p>`) +
-  '<p class="mut">Pending runs are tagged with how they compare to the current record. Approving a run updates the public boards straight away.</p>';
+  '<p class="mut">Pending runs are grouped by player and proof link. Tick rows (or use Select group) to approve or reject many at once. Approving updates the public boards straight away.</p>';
+  updSel();
 }
+app.addEventListener('change', e => {
+  const t = e.target;
+  if (t.dataset.sel) { const id = Number(t.dataset.sel); t.checked ? sel.add(id) : sel.delete(id); updSel(); }
+  else if ('selall' in t.dataset) { tabRows().forEach(r => t.checked ? sel.add(r.id) : sel.delete(r.id)); renderAdmin(); }
+});
 app.addEventListener('click', async e => {
   const t = e.target.closest('[data-tab],[data-act]'); if (!t) return;
   if (t.dataset.tab) { adminTab = t.dataset.tab; return renderAdmin(); }
-  const act = t.dataset.act, id = Number(t.dataset.id), r = adminRows.find(x => x.id === id);
+  const act = t.dataset.act, id = Number(t.dataset.id), r = adminRows.find(x => x.id === id), now = new Date().toISOString();
   try {
-    if (act === 'logout') { api.logout(); adminRows = []; badge(); return loginView(); }
+    if (act === 'logout') { api.logout(); adminRows = []; sel.clear(); badge(); return loginView(); }
     if (act === 'edit') return openEdit(r);
-    if (act === 'approve') await api.update(id, {status: 'approved', note: null, reviewed_at: new Date().toISOString()});
+    if (act === 'grp') { const g = groups[id] || [], all = g.every(i => sel.has(i)); g.forEach(i => all ? sel.delete(i) : sel.add(i)); return renderAdmin(); }
+    if (act[0] === 'b') {   // batch actions on ticked rows: bapprove, breject, bpending, bdelete
+      const ids = selIds(); if (!ids.length) return;
+      if (act === 'bapprove') await api.updateMany(ids, {status: 'approved', note: null, reviewed_at: now});
+      else if (act === 'bpending') await api.updateMany(ids, {status: 'pending', reviewed_at: null});
+      else if (act === 'breject') { const note = prompt(`Reason for rejecting ${ids.length} run${ids.length === 1 ? '' : 's'} (optional, max 200 chars):`); if (note === null) return;
+        await api.updateMany(ids, {status: 'rejected', note: note.slice(0, 200) || null, reviewed_at: now}); }
+      else if (act === 'bdelete') { if (!confirm(`Permanently delete ${ids.length} run${ids.length === 1 ? '' : 's'}?`)) return; await api.removeMany(ids); }
+      ids.forEach(i => sel.delete(i));
+    }
+    else if (act === 'approve') await api.update(id, {status: 'approved', note: null, reviewed_at: now});
     else if (act === 'pending') await api.update(id, {status: 'pending', reviewed_at: null});
     else if (act === 'reject') { const note = prompt('Reason for rejecting (optional, max 200 chars):'); if (note === null) return;
-      await api.update(id, {status: 'rejected', note: note.slice(0, 200) || null, reviewed_at: new Date().toISOString()}); }
+      await api.update(id, {status: 'rejected', note: note.slice(0, 200) || null, reviewed_at: now}); }
     else if (act === 'delete') { if (!confirm(`Permanently delete ${r.name}’s ${fmtT(r.cs)} on ${label(key(r))}?`)) return; await api.remove(id); }
     await reloadAdmin(); renderAdmin();
   } catch (err) { alert('Failed: ' + err.message); }
@@ -445,6 +599,7 @@ function route() {
   if (KIND[v]) boardView(v, arg);
   else if (v === 'players') playersView(arg);
   else if (v === 'submit') submitView(arg);
+  else if (v === 'bulk') bulkView();
   else if (v === 'admin') adminView();
   else boardView('lands', '');
 }
