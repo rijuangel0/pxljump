@@ -1,0 +1,460 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>pxljump · World Records</title>
+<style>
+:root{--bg:#fff;--fg:#111;--mut:#6b6b6b;--line:#e4e4e4;--acc:#2a5bd7;--ok:#1a7f37;--bad:#c62828;--card:#f6f6f6}
+@media (prefers-color-scheme:dark){:root{--bg:#0e0e10;--fg:#ececec;--mut:#9a9a9a;--line:#27272b;--acc:#7da2ff;--ok:#4cc26a;--bad:#ff7b7b;--card:#161619}}
+*{box-sizing:border-box}
+html{color-scheme:light dark}
+body{margin:0;background:var(--bg);color:var(--fg);font:15px/1.5 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif}
+.wrap{max-width:880px;margin:0 auto;padding:20px 16px 48px}
+a{color:var(--acc);text-decoration:none}a:hover{text-decoration:underline}
+header{display:flex;flex-wrap:wrap;align-items:baseline;gap:8px 24px;margin-bottom:20px;border-bottom:1px solid var(--line);padding-bottom:12px}
+header h1{font-size:18px;margin:0;font-weight:700;letter-spacing:.02em}
+header h1 a{color:var(--fg)}
+nav{display:flex;flex-wrap:wrap;gap:4px 16px}
+nav a{color:var(--mut);padding:2px 0;border-bottom:2px solid transparent}
+nav a:hover{color:var(--fg);text-decoration:none}
+nav a[aria-current=page]{color:var(--fg);border-color:var(--acc)}
+h2{font-size:16px;margin:28px 0 8px}
+h1.page{font-size:20px;margin:0 0 12px}
+.mut{color:var(--mut)}.err{color:var(--bad)}.ok{color:var(--ok)}
+.scroll{overflow-x:auto}
+table{width:100%;border-collapse:collapse}
+th{text-align:left;font-weight:500;color:var(--mut);font-size:12px;text-transform:uppercase;letter-spacing:.05em;padding:6px 10px 6px 0;border-bottom:1px solid var(--line);white-space:nowrap}
+td{padding:7px 10px 7px 0;border-bottom:1px solid var(--line);vertical-align:top}
+.t{font-family:ui-monospace,Menlo,Consolas,monospace;font-variant-numeric:tabular-nums;white-space:nowrap}
+tr.cur td{font-weight:600}
+tr.sel td{background:var(--card)}
+.tag{font-size:11px;padding:0 6px;border:1px solid var(--acc);color:var(--acc);border-radius:3px;font-weight:500;margin-left:4px}
+.panel{background:var(--card);border:1px solid var(--line);border-radius:6px;padding:12px 14px;margin-bottom:8px}
+.bar{display:flex;flex-wrap:wrap;justify-content:space-between;align-items:center;gap:8px}
+.big{font:700 26px ui-monospace,Menlo,Consolas,monospace}
+.grid{display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px}
+.grid .wide{grid-column:1/-1}
+@media(max-width:640px){.grid{grid-template-columns:1fr 1fr}}
+@media(max-width:420px){.grid{grid-template-columns:1fr}}
+label{display:flex;flex-direction:column;gap:3px;font-size:13px;color:var(--mut)}
+label small{font-size:12px}
+input,select{font:inherit;color:var(--fg);background:var(--bg);border:1px solid var(--line);border-radius:5px;padding:7px 9px;min-width:0}
+input:focus,select:focus{outline:2px solid var(--acc);outline-offset:-1px}
+button,.btn{font:inherit;cursor:pointer;color:var(--bg);background:var(--fg);border:0;border-radius:5px;padding:7px 14px;display:inline-block}
+button:disabled{opacity:.5;cursor:default}
+.btn:hover{text-decoration:none;opacity:.85}
+button.sm{padding:2px 8px;font-size:12px;margin-right:4px}
+button.ghost{background:none;color:var(--fg);border:1px solid var(--line)}
+button.danger{background:var(--bad);color:#fff}
+.hp{position:absolute;left:-9999px;width:1px;height:1px;opacity:0}
+.tabs{display:flex;gap:6px;margin:0 0 12px}
+.tabs button{background:none;color:var(--mut);border:1px solid var(--line)}
+.tabs button.on{background:var(--fg);color:var(--bg);border-color:var(--fg)}
+.banner{background:var(--card);border:1px dashed var(--mut);border-radius:6px;padding:8px 12px;margin-bottom:16px;font-size:13px;color:var(--mut)}
+dialog{background:var(--bg);color:var(--fg);border:1px solid var(--line);border-radius:8px;padding:18px;width:min(560px,94vw)}
+dialog::backdrop{background:#0008}
+footer{margin-top:40px;color:var(--mut);font-size:12px}
+</style>
+</head>
+<body>
+<div class="wrap">
+<header>
+  <h1><a href="#/lands">pxljump · WR</a></h1>
+  <nav id="nav">
+    <a href="#/lands" data-v="lands">Lands</a>
+    <a href="#/areas" data-v="areas">Areas</a>
+    <a href="#/levels" data-v="levels">Levels</a>
+    <a href="#/players" data-v="players">Players</a>
+    <a href="#/submit" data-v="submit">Submit</a>
+    <a href="#/admin" data-v="admin">Admin<span id="badge"></span></a>
+  </nav>
+</header>
+<div id="demo" class="banner" hidden>Demo mode: no database is configured, so data lives only in this browser. Set <code>SUPABASE_URL</code> and <code>SUPABASE_ANON_KEY</code> in <code>CONFIG</code> to go live. Admin password for the demo is <code>demo</code>.</div>
+<main id="app"><p class="mut">Loading…</p></main>
+<footer>Times are M:SS.cc · a tie keeps the earlier record · all runs are reviewed by a moderator before they appear.</footer>
+</div>
+
+<dialog id="dlg">
+  <form id="ef" class="grid" method="dialog" autocomplete="off">
+    <h2 class="wide" style="margin:0">Edit run</h2>
+    <label>Category<input name="cat" placeholder="1-2-3"></label>
+    <label>Name<input name="name" maxlength="24"></label>
+    <label>Time<input name="time"></label>
+    <label>Date<input name="date" type="date"></label>
+    <label>Version<input name="version" maxlength="20"></label>
+    <label class="wide">Proof<input name="proof"></label>
+    <div class="wide"><button>Save</button> <button type="button" class="ghost" id="ecancel">Cancel</button> <span id="emsg" class="err"></span></div>
+  </form>
+</dialog>
+
+<script>
+/* =====================================================================
+   CONFIG: fill these in after running setup.sql in Supabase.
+   Leave them empty to try the page in demo mode.
+   ===================================================================== */
+const CONFIG = {
+  SUPABASE_URL: 'https://modzizogfpjdgaucmmmr.supabase.co',
+  SUPABASE_ANON_KEY: 'sb_publishable_yVj2Nn2A2dufU5rNXbqstw_1tiWqo63',
+  GAME_PATH: '../',        // folder holding levels.json + level-manifest.json, relative to this page
+  VERSIONS: ['Release v1.7'], // type new v.s here each update
+};
+const DEMO = !CONFIG.SUPABASE_URL || !CONFIG.SUPABASE_ANON_KEY;
+
+/* ---------- helpers ---------- */
+const $ = (s, r = document) => r.querySelector(s);
+const app = $('#app');
+const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const fmtT = cs => Math.floor(cs / 6000) + ':' + ((cs % 6000) / 100).toFixed(2).padStart(5, '0');   // same as the game
+const fmtChange = c => c == null ? '—' : (c < 0 ? '−' : c > 0 ? '+' : '±') + (Math.abs(c) / 100).toFixed(2) + 's';
+function parseT(str) {
+  const m = String(str).trim().match(/^(?:(\d+):)?(\d+)(?:[.,](\d{1,2}))?$/);
+  if (!m || (m[1] && +m[2] >= 60)) return null;
+  const cs = ((+(m[1] || 0)) * 60 + +m[2]) * 100 + (m[3] ? +m[3].padEnd(2, '0') : 0);
+  return cs > 0 && cs <= 36000000 ? cs : null;
+}
+const today = () => { const d = new Date(); return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0'); };
+const key = r => [r.land, r.area, r.level].filter(v => v != null).join('-');
+const label = k => { const n = k.split('-'); return n.length === 1 ? 'Land ' + k : n.length === 2 ? 'Area ' + k : 'Level ' + k; };
+const nat = (a, b) => { const x = a.split('-').map(Number), y = b.split('-').map(Number); for (let i = 0; i < 3; i++) { const d = (x[i] ?? -1) - (y[i] ?? -1); if (d) return d; } return 0; };
+const cmpRun = (a, b) => a.run_date !== b.run_date ? (a.run_date < b.run_date ? -1 : 1) : a.created_at !== b.created_at ? (a.created_at < b.created_at ? -1 : 1) : a.id - b.id;
+const proofLink = u => /^https?:\/\//i.test(u) ? `<a href="${esc(u)}" target="_blank" rel="noopener noreferrer nofollow">proof ↗</a>` : '—';
+const playerLink = n => `<a href="#/players/${encodeURIComponent(n)}">${esc(n)}</a>`;
+const nm = (p, n, name) => name && name !== `${p} ${n}` ? `${p} ${n} — ${name}` : `${p} ${n}`;
+const KIND = {lands: 'land', areas: 'area', levels: 'level'};
+
+/* ---------- API (Supabase REST, or a localStorage demo) ---------- */
+let session = null;
+try { session = JSON.parse(sessionStorage.getItem('wr_session')); } catch {}
+function setSession(j) {
+  session = {access_token: j.access_token, refresh_token: j.refresh_token, exp: Date.now() + (j.expires_in - 30) * 1000};
+  sessionStorage.setItem('wr_session', JSON.stringify(session));
+}
+async function authCall(grant, body) {
+  const r = await fetch(`${CONFIG.SUPABASE_URL}/auth/v1/token?grant_type=${grant}`, {
+    method: 'POST', headers: {apikey: CONFIG.SUPABASE_ANON_KEY, 'Content-Type': 'application/json'}, body: JSON.stringify(body)});
+  const j = await r.json().catch(() => ({}));
+  if (!r.ok) throw new Error(j.error_description || j.msg || 'Login failed');
+  setSession(j);
+}
+async function req(method, path, {body, auth, prefer, range} = {}) {
+  if (auth) {
+    if (!session) throw new Error('Not logged in');
+    if (Date.now() >= session.exp) {
+      try { await authCall('refresh_token', {refresh_token: session.refresh_token}); }
+      catch { session = null; sessionStorage.removeItem('wr_session'); throw new Error('Session expired, please log in again'); }
+    }
+  }
+  const headers = {apikey: CONFIG.SUPABASE_ANON_KEY, 'Content-Type': 'application/json',
+    Authorization: 'Bearer ' + (auth ? session.access_token : CONFIG.SUPABASE_ANON_KEY)};
+  if (prefer) headers.Prefer = prefer;
+  if (range) { headers['Range-Unit'] = 'items'; headers.Range = range; }
+  const res = await fetch(CONFIG.SUPABASE_URL + path, {method, headers, body: body ? JSON.stringify(body) : undefined});
+  if (!res.ok) {
+    const j = await res.json().catch(() => ({}));
+    const e = new Error(j.message || 'Request failed (' + res.status + ')'); e.status = res.status; throw e;
+  }
+  return (res.headers.get('content-type') || '').includes('json') ? res.json() : null;
+}
+async function fetchAll(q, auth) {
+  const out = [];
+  for (let i = 0; ; i += 1000) {
+    let part;
+    try { part = await req('GET', '/rest/v1/runs?' + q, {auth, range: `${i}-${i + 999}`}); }
+    catch (e) { if (e.status === 416 && out.length) break; throw e; }
+    out.push(...part);
+    if (part.length < 1000) break;
+  }
+  return out;
+}
+const demo = {
+  load() {
+    let r; try { r = JSON.parse(localStorage.getItem('wr_demo')); } catch {}
+    if (!Array.isArray(r)) {
+      const mk = (id, land, area, level, name, cs, d, v, status = 'approved') => ({id, land, area, level, name, cs, run_date: d, version: v,
+        proof: 'https://example.com/proof/' + id, status, note: null, created_at: d + 'T12:00:00Z', reviewed_at: null});
+      r = [mk(1,1,1,1,'Alice',1250,'2026-08-01','1.0'), mk(2,1,1,1,'Bob',1210,'2026-08-15','1.0'), mk(3,1,1,1,'Alice',1195,'2026-09-10','1.1'),
+           mk(4,1,1,1,'Cleo',1195,'2026-09-12','1.1'), mk(5,1,1,2,'Bob',2040,'2026-08-20','1.0'), mk(6,1,1,null,'Bob',31200,'2026-09-01','1.1'),
+           mk(7,1,1,null,'Alice',30550,'2026-09-20','1.1'), mk(8,1,null,null,'Alice',182000,'2026-10-02','1.1'),
+           mk(9,1,1,1,'Dave',1180,'2026-10-20','1.1','pending')];
+      localStorage.setItem('wr_demo', JSON.stringify(r));
+    }
+    return r;
+  },
+  save: r => localStorage.setItem('wr_demo', JSON.stringify(r)),
+};
+const api = DEMO ? {
+  approved: async () => demo.load().filter(r => r.status === 'approved'),
+  submit: async row => { const a = demo.load(); a.push({...row, id: Date.now(), status: 'pending', note: null, created_at: new Date().toISOString(), reviewed_at: null}); demo.save(a); },
+  loggedIn: () => sessionStorage.getItem('wr_demo_admin') === '1',
+  login: async (e, p) => { if (p !== 'demo') throw new Error('The demo password is “demo”'); sessionStorage.setItem('wr_demo_admin', '1'); },
+  logout: () => sessionStorage.removeItem('wr_demo_admin'),
+  all: async () => demo.load(),
+  update: async (id, p) => { const a = demo.load(), r = a.find(x => x.id === id); if (r) Object.assign(r, p); demo.save(a); },
+  remove: async id => demo.save(demo.load().filter(r => r.id !== id)),
+} : {
+  approved: () => fetchAll('select=*&status=eq.approved&order=id.asc'),
+  submit: row => req('POST', '/rest/v1/runs', {body: row, prefer: 'return=minimal'}),
+  loggedIn: () => !!session,
+  login: (email, password) => authCall('password', {email, password}),
+  logout: () => { session = null; sessionStorage.removeItem('wr_session'); },
+  all: () => fetchAll('select=*&order=id.asc', true),
+  update: (id, p) => req('PATCH', `/rest/v1/runs?id=eq.${Number(id)}`, {body: p, auth: true, prefer: 'return=minimal'}),
+  remove: id => req('DELETE', `/rest/v1/runs?id=eq.${Number(id)}`, {auth: true}),
+};
+
+/* ---------- game structure (lands / areas / levels) ---------- */
+let STRUCT = [];
+async function loadStruct() {
+  try {
+    const [cfg, man] = await Promise.all(['levels.json', 'level-manifest.json'].map(f => fetch(CONFIG.GAME_PATH + f).then(r => { if (!r.ok) throw 0; return r.json(); })));
+    STRUCT = cfg.lands.map((l, li) => ({n: li + 1, name: l.name, areas: l.areas.map((a, ai) => ({
+      n: ai + 1, name: a.name, levels: (man[`${li + 1}-${ai + 1}`] || []).map(x => x.number)}))}));
+  } catch {
+    STRUCT = [{n: 1, name: 'Land 1', areas: [1, 2, 3, 4, 5].map(n => ({n, name: 'Area ' + n, levels: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10]}))}];
+  }
+}
+function cats(kind) {
+  const out = [];
+  for (const L of STRUCT) {
+    if (kind === 'land') out.push(String(L.n));
+    else for (const A of L.areas) {
+      if (kind === 'area') out.push(L.n + '-' + A.n);
+      else for (const v of A.levels) out.push(L.n + '-' + A.n + '-' + v);
+    }
+  }
+  return out;
+}
+
+/* ---------- records ---------- */
+let RUNS = [], BY = new Map(), REC = new Map();
+function records(runs) {                       // runs sorted oldest first -> record-setting runs only
+  const out = []; let best = null;
+  for (const r of runs) if (best === null || r.cs < best) { out.push({...r, change: best === null ? null : r.cs - best}); best = r.cs; }
+  return out;
+}
+function build(rows) {
+  RUNS = rows.slice().sort(cmpRun); BY = new Map(); REC = new Map();
+  for (const r of RUNS) { const k = key(r); if (!BY.has(k)) BY.set(k, []); BY.get(k).push(r); }
+  for (const [k, a] of BY) REC.set(k, records(a));
+}
+const wr = k => { const r = REC.get(k); return r && r.length ? r[r.length - 1] : null; };
+
+/* ---------- validation (shared by submit + admin edit) ---------- */
+function validate(v) {
+  const p = String(v.cat).split('-');
+  if (p.length > 3 || p.some(x => !/^\d+$/.test(x))) return {error: 'Invalid category'};
+  const [land, area, level] = p.map(Number);
+  const L = STRUCT.find(l => l.n === land), A = p.length > 1 ? L?.areas.find(a => a.n === area) : null;
+  if (!L || (p.length > 1 && !A) || (p.length > 2 && !A.levels.includes(level))) return {error: 'That land / area / level doesn’t exist'};
+  const name = v.name.trim().replace(/\s+/g, ' ');
+  if (!name || name.length > 24) return {error: 'Name must be 1–24 characters'};
+  const cs = parseT(v.time);
+  if (!cs) return {error: 'Time must look like 1:23.45 or 83.45 (max 2 decimals)'};
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(v.date) || v.date > today()) return {error: 'Date is missing or in the future'};
+  const version = v.version.trim();
+  if (!version || version.length > 20) return {error: 'Version must be 1–20 characters'};
+  const proof = v.proof.trim();
+  if (!/^https?:\/\/[^\s]+$/i.test(proof) || proof.length > 500) return {error: 'Proof must be an http(s) link (Discord message or image)'};
+  return {row: {land, area: area ?? null, level: level ?? null, name, cs, run_date: v.date, version, proof}};
+}
+
+/* ---------- public views ---------- */
+function overview(kind, sel) {
+  return `<div class="scroll"><table><thead><tr><th>${kind[0].toUpperCase() + kind.slice(1)}</th><th>Record</th><th>Holder</th><th>Version</th><th>Date</th></tr></thead><tbody>` +
+    cats(kind).map(k => { const w = wr(k);
+      return `<tr class="${k === sel ? 'sel' : ''}"><td><a href="#/${kind}s/${k}">${label(k)}</a></td>` +
+        (w ? `<td class="t">${fmtT(w.cs)}</td><td>${playerLink(w.name)}</td><td>${esc(w.version)}</td><td class="t">${w.run_date}</td>` : '<td class="mut" colspan="4">no record yet</td>') + '</tr>'; }).join('') +
+    '</tbody></table></div>';
+}
+function detail(k) {
+  const recs = (REC.get(k) || []).slice().reverse();
+  let h = `<div class="panel"><div class="bar"><div><h1 class="page" style="margin:0">${label(k)}</h1>`;
+  if (recs.length) h += `<div class="big">${fmtT(recs[0].cs)}</div><div class="mut">${playerLink(recs[0].name)} · ${recs[0].run_date} · v${esc(recs[0].version)}</div>`;
+  else h += '<div class="mut">No record yet</div>';
+  h += `</div><a class="btn" href="#/submit/${k}">Submit a run</a></div></div>`;
+  if (recs.length) h += '<div class="scroll"><table><thead><tr><th>Time</th><th>Change</th><th>Holder</th><th>Version</th><th>Date</th><th>Proof</th></tr></thead><tbody>' +
+    recs.map((r, i) => `<tr class="${i ? '' : 'cur'}"><td class="t">${fmtT(r.cs)}${i ? '' : '<span class="tag">WR</span>'}</td><td class="t mut">${fmtChange(r.change)}</td><td>${playerLink(r.name)}</td><td>${esc(r.version)}</td><td class="t">${r.run_date}</td><td>${proofLink(r.proof)}</td></tr>`).join('') +
+    '</tbody></table></div>';
+  return h;
+}
+function boardView(v, sel) {
+  const kind = KIND[v];
+  if (sel && !cats(kind).includes(sel)) sel = '';
+  let h = sel ? `<p><a href="#/${v}">← all ${v}</a></p>` + detail(sel) + '<h2>All ' + v + '</h2>' : `<h1 class="page">${kind === 'land' ? 'Lands' : kind === 'area' ? 'Areas' : 'Levels'}</h1><p class="mut" style="margin-top:-6px">${
+    kind === 'land' ? 'Full land runs.' : kind === 'area' ? 'Full area runs (all levels in an area).' : 'Single level runs.'} Pick a row for its record history.</p>`;
+  h += overview(kind, sel);
+  if (v === 'lands' && !sel) {
+    const all = []; for (const [k, a] of REC) for (const r of a) all.push({k, r});
+    all.sort((x, y) => cmpRun(y.r, x.r));
+    if (all.length) h += '<h2>Recent records</h2><div class="scroll"><table><thead><tr><th>Category</th><th>Time</th><th>Change</th><th>Holder</th><th>Date</th></tr></thead><tbody>' +
+      all.slice(0, 8).map(({k, r}) => `<tr><td><a href="#/${['lands','areas','levels'][k.split('-').length - 1]}/${k}">${label(k)}</a></td><td class="t">${fmtT(r.cs)}</td><td class="t mut">${fmtChange(r.change)}</td><td>${playerLink(r.name)}</td><td class="t">${r.run_date}</td></tr>`).join('') + '</tbody></table></div>';
+  }
+  app.innerHTML = h;
+}
+function playersMap() {
+  const m = new Map();
+  for (const r of RUNS) { const id = r.name.toLowerCase(); if (!m.has(id)) m.set(id, {name: r.name, runs: [], wrs: 0}); const p = m.get(id); p.name = r.name; p.runs.push(r); }
+  for (const k of REC.keys()) { const w = wr(k), p = w && m.get(w.name.toLowerCase()); if (p) p.wrs++; }
+  return m;
+}
+function playersView(name) {
+  const m = playersMap();
+  if (name && m.has(name.toLowerCase())) {
+    const p = m.get(name.toLowerCase()), by = new Map();
+    for (const r of p.runs) { const k = key(r); if (!by.has(k)) by.set(k, []); by.get(k).push(r); }
+    const rows = [...by.keys()].sort(nat).flatMap(k => records(by.get(k)).reverse().map((r, i) => ({k, r, i})));
+    app.innerHTML = `<p><a href="#/players">← all players</a></p><div class="panel"><h1 class="page" style="margin:0">${esc(p.name)}</h1><div class="mut">${p.wrs} current WR${p.wrs === 1 ? '' : 's'} · ${p.runs.length} approved run${p.runs.length === 1 ? '' : 's'} · ${by.size} categor${by.size === 1 ? 'y' : 'ies'}</div></div>` +
+      '<div class="scroll"><table><thead><tr><th>Category</th><th>Time</th><th>Change</th><th>Version</th><th>Date</th><th>Proof</th></tr></thead><tbody>' +
+      rows.map(({k, r, i}) => `<tr class="${i ? '' : 'cur'}"><td>${i ? '' : `<a href="#/${['lands','areas','levels'][k.split('-').length - 1]}/${k}">${label(k)}</a>`}</td><td class="t">${fmtT(r.cs)}${wr(k)?.id === r.id ? '<span class="tag">WR</span>' : ''}</td><td class="t mut">${fmtChange(r.change)}</td><td>${esc(r.version)}</td><td class="t">${r.run_date}</td><td>${proofLink(r.proof)}</td></tr>`).join('') +
+      '</tbody></table></div><p class="mut">Each category lists this player’s personal bests, newest first. Change is versus their previous best.</p>';
+    return;
+  }
+  const list = [...m.values()].sort((a, b) => b.wrs - a.wrs || b.runs.length - a.runs.length || a.name.localeCompare(b.name));
+  app.innerHTML = '<h1 class="page">Players</h1><p><input id="q" placeholder="Search players…" style="width:100%;max-width:320px"></p>' +
+    (list.length ? '<div class="scroll"><table><thead><tr><th>Player</th><th>WRs</th><th>Runs</th></tr></thead><tbody id="pl">' +
+    list.map(p => `<tr data-n="${esc(p.name.toLowerCase())}"><td>${playerLink(p.name)}</td><td class="t">${p.wrs}</td><td class="t mut">${p.runs.length}</td></tr>`).join('') + '</tbody></table></div>' : '<p class="mut">No players yet.</p>');
+  $('#q')?.addEventListener('input', e => { const q = e.target.value.toLowerCase(); document.querySelectorAll('#pl tr').forEach(tr => tr.hidden = !tr.dataset.n.includes(q)); });
+}
+
+/* ---------- submit ---------- */
+function submitView(pre) {
+  const pp = (pre || '').split('-').map(Number);
+  const saved = {name: localStorage.getItem('wr_name') || '', version: localStorage.getItem('wr_version') || CONFIG.VERSIONS[0] || ''};
+  app.innerHTML = `<h1 class="page">Submit a run</h1>
+  <form id="f" class="grid" autocomplete="off" novalidate>
+    <label>Land<select name="land"></select></label>
+    <label>Area<select name="area"></select></label>
+    <label>Level<select name="level"></select></label>
+    <div class="wide" id="catinfo"></div>
+    <label>Name<input name="name" maxlength="24" value="${esc(saved.name)}"></label>
+    <label>Time<input name="time" placeholder="1:23.45" inputmode="decimal"></label>
+    <label>Date<input name="date" type="date" value="${today()}" max="${today()}"><small>Filled from your device, change it if it’s wrong</small></label>
+    <label>Version<input name="version" maxlength="20" list="vers" value="${esc(saved.version)}" placeholder="1.0"></label>
+    <label class="wide">Proof<small>Discord message link or external image link (it needs to stay available)</small><input name="proof" inputmode="url" placeholder="https://"></label>
+    <input name="hp" class="hp" tabindex="-1" autocomplete="off" aria-hidden="true">
+    <div class="wide"><button id="go">Submit</button> <span id="msg"></span></div>
+  </form><datalist id="vers">${CONFIG.VERSIONS.map(v => `<option value="${esc(v)}">`).join('')}</datalist>`;
+  const f = $('#f'), L = () => STRUCT.find(l => l.n == f.land.value), A = () => L().areas.find(a => a.n == f.area.value);
+  f.land.innerHTML = STRUCT.map(l => `<option value="${l.n}">${esc(nm('Land', l.n, l.name))}</option>`).join('');
+  if (STRUCT.some(l => l.n === pp[0])) f.land.value = pp[0];
+  const fillArea = () => { f.area.innerHTML = '<option value="">— whole land —</option>' + L().areas.map(a => `<option value="${a.n}">${esc(nm('Area', a.n, a.name))}</option>`).join(''); };
+  const fillLevel = () => { const a = f.area.value ? A() : null; f.level.disabled = !a; f.level.innerHTML = '<option value="">— whole area —</option>' + (a ? a.levels.map(n => `<option value="${n}">Level ${n}</option>`).join('') : ''); };
+  const info = () => { const k = [f.land.value, f.area.value, f.level.value].filter(Boolean).join('-'), w = wr(k);
+    $('#catinfo').innerHTML = `<span class="mut">Submitting for <b style="color:var(--fg)">${label(k)}</b> · ${w ? `current WR ${fmtT(w.cs)} by ${esc(w.name)}` : 'no record yet'}</span>`; };
+  fillArea(); if (pp[1] && L().areas.some(a => a.n === pp[1])) f.area.value = pp[1];
+  fillLevel(); if (pp[2] && f.area.value && A().levels.includes(pp[2])) f.level.value = pp[2];
+  info();
+  f.land.onchange = () => { fillArea(); fillLevel(); info(); };
+  f.area.onchange = () => { fillLevel(); info(); };
+  f.level.onchange = info;
+  f.onsubmit = async e => {
+    e.preventDefault();
+    const msg = $('#msg'); msg.className = 'err';
+    if (f.hp.value) { msg.className = 'ok'; msg.textContent = 'Submitted.'; return; }   // bots land here
+    const wait = 30000 - (Date.now() - +(localStorage.getItem('wr_last') || 0));
+    if (wait > 0) { msg.textContent = `Please wait ${Math.ceil(wait / 1000)}s before submitting again.`; return; }
+    const v = validate({cat: [f.land.value, f.area.value, f.level.value].filter(Boolean).join('-'), name: f.name.value, time: f.time.value, date: f.date.value, version: f.version.value, proof: f.proof.value});
+    if (v.error) { msg.textContent = v.error; return; }
+    $('#go').disabled = true; msg.className = 'mut'; msg.textContent = 'Sending…';
+    try {
+      await api.submit(v.row);
+      localStorage.setItem('wr_name', v.row.name); localStorage.setItem('wr_version', v.row.version); localStorage.setItem('wr_last', Date.now());
+      f.time.value = ''; f.proof.value = '';
+      msg.className = 'ok'; msg.textContent = 'Submitted! A moderator will review it before it appears.';
+    } catch (err) { msg.className = 'err'; msg.textContent = 'Couldn’t submit: ' + err.message; }
+    $('#go').disabled = false;
+  };
+}
+
+/* ---------- admin ---------- */
+let adminRows = [], adminTab = 'pending';
+const badge = () => { const n = adminRows.filter(r => r.status === 'pending').length; $('#badge').textContent = api.loggedIn() && n ? ` (${n})` : ''; };
+function loginView(note) {
+  app.innerHTML = `<h1 class="page">Admin login</h1><form id="lf" class="grid" style="max-width:420px;grid-template-columns:1fr">
+    <label>Email<input name="email" type="email" autocomplete="username"></label>
+    <label>Password<input name="pw" type="password" autocomplete="current-password"></label>
+    <div><button>Log in</button> <span id="lm" class="err">${esc(note || '')}</span></div></form>`;
+  $('#lf').onsubmit = async e => {
+    e.preventDefault(); const f = e.target; $('#lm').textContent = '';
+    try { await api.login(f.email.value.trim(), f.pw.value); await adminView(); }
+    catch (err) { $('#lm').textContent = err.message; }
+  };
+}
+async function reloadAdmin() { adminRows = await api.all(); build(adminRows.filter(r => r.status === 'approved')); badge(); }
+async function adminView() {
+  if (!api.loggedIn()) return loginView();
+  app.innerHTML = '<p class="mut">Loading…</p>';
+  try { await reloadAdmin(); } catch (e) { api.logout(); return loginView(e.message); }
+  renderAdmin();
+}
+function impact(r) {
+  const w = wr(key(r)); if (!w) return '<span class="ok">first record</span>';
+  if (r.cs < w.cs) return `<span class="ok">new WR ${fmtChange(r.cs - w.cs)}</span>`;
+  return r.cs === w.cs ? 'ties WR' : `<span class="mut">${fmtChange(r.cs - w.cs)} off WR</span>`;
+}
+function renderAdmin() {
+  const n = s => adminRows.filter(r => r.status === s).length;
+  const rows = adminRows.filter(r => r.status === adminTab).sort((a, b) => adminTab === 'pending' ? cmpRun(a, b) : cmpRun(b, a));
+  const btn = (act, id, t, c = '') => `<button class="sm ${c}" data-act="${act}" data-id="${id}">${t}</button>`;
+  app.innerHTML = `<div class="bar"><h1 class="page" style="margin:0">Admin</h1><button class="ghost sm" data-act="logout">Log out</button></div>
+  <div class="tabs" style="margin-top:12px">${['pending', 'approved', 'rejected'].map(s => `<button class="${s === adminTab ? 'on' : ''}" data-tab="${s}">${s} (${n(s)})</button>`).join('')}</div>` +
+  (rows.length ? '<div class="scroll"><table><thead><tr><th>Category</th><th>Player</th><th>Time</th><th>Date</th><th>Ver.</th><th>Proof</th><th>Info</th><th></th></tr></thead><tbody>' +
+    rows.map(r => `<tr><td>${label(key(r))}</td><td>${esc(r.name)}</td><td class="t">${fmtT(r.cs)}</td><td class="t">${r.run_date}</td><td>${esc(r.version)}</td><td>${proofLink(r.proof)}</td>
+      <td>${adminTab === 'pending' ? impact(r) : adminTab === 'rejected' ? `<span class="mut">${esc(r.note || '')}</span>` : ''}<div class="mut" style="font-size:12px">sent ${String(r.created_at).slice(0, 10)}</div></td>
+      <td style="white-space:nowrap">${adminTab !== 'approved' ? btn('approve', r.id, 'Approve') : ''}${adminTab === 'pending' ? btn('reject', r.id, 'Reject', 'ghost') : ''}${adminTab !== 'pending' ? btn('pending', r.id, 'Unreview', 'ghost') : ''}${btn('edit', r.id, 'Edit', 'ghost')}${btn('delete', r.id, 'Delete', 'danger')}</td></tr>`).join('') + '</tbody></table></div>'
+    : `<p class="mut">Nothing ${adminTab}.</p>`) +
+  '<p class="mut">Pending runs are tagged with how they compare to the current record. Approving a run updates the public boards straight away.</p>';
+}
+app.addEventListener('click', async e => {
+  const t = e.target.closest('[data-tab],[data-act]'); if (!t) return;
+  if (t.dataset.tab) { adminTab = t.dataset.tab; return renderAdmin(); }
+  const act = t.dataset.act, id = Number(t.dataset.id), r = adminRows.find(x => x.id === id);
+  try {
+    if (act === 'logout') { api.logout(); adminRows = []; badge(); return loginView(); }
+    if (act === 'edit') return openEdit(r);
+    if (act === 'approve') await api.update(id, {status: 'approved', note: null, reviewed_at: new Date().toISOString()});
+    else if (act === 'pending') await api.update(id, {status: 'pending', reviewed_at: null});
+    else if (act === 'reject') { const note = prompt('Reason for rejecting (optional, max 200 chars):'); if (note === null) return;
+      await api.update(id, {status: 'rejected', note: note.slice(0, 200) || null, reviewed_at: new Date().toISOString()}); }
+    else if (act === 'delete') { if (!confirm(`Permanently delete ${r.name}’s ${fmtT(r.cs)} on ${label(key(r))}?`)) return; await api.remove(id); }
+    await reloadAdmin(); renderAdmin();
+  } catch (err) { alert('Failed: ' + err.message); }
+});
+let editing = null;
+function openEdit(r) {
+  editing = r; const f = $('#ef');
+  f.cat.value = key(r); f.name.value = r.name; f.time.value = fmtT(r.cs); f.date.value = r.run_date; f.version.value = r.version; f.proof.value = r.proof;
+  $('#emsg').textContent = ''; $('#dlg').showModal();
+}
+$('#ecancel').onclick = () => $('#dlg').close();
+$('#ef').onsubmit = async e => {
+  e.preventDefault(); const f = e.target;
+  const v = validate({cat: f.cat.value.trim(), name: f.name.value, time: f.time.value, date: f.date.value, version: f.version.value, proof: f.proof.value});
+  if (v.error) { $('#emsg').textContent = v.error; return; }
+  try { await api.update(editing.id, v.row); $('#dlg').close(); await reloadAdmin(); renderAdmin(); }
+  catch (err) { $('#emsg').textContent = err.message; }
+};
+
+/* ---------- router ---------- */
+function route() {
+  const parts = location.hash.replace(/^#\/?/, '').split('/');
+  const v = parts[0] || 'lands', arg = decodeURIComponent(parts[1] || '');
+  document.querySelectorAll('#nav a').forEach(a => a.dataset.v === v ? a.setAttribute('aria-current', 'page') : a.removeAttribute('aria-current'));
+  window.scrollTo(0, 0);
+  if (KIND[v]) boardView(v, arg);
+  else if (v === 'players') playersView(arg);
+  else if (v === 'submit') submitView(arg);
+  else if (v === 'admin') adminView();
+  else boardView('lands', '');
+}
+(async function init() {
+  if (DEMO) $('#demo').hidden = false;
+  try { await loadStruct(); build(await api.approved()); }
+  catch (e) { app.innerHTML = `<p class="err">Couldn’t load records: ${esc(e.message)}</p>`; return; }
+  if (api.loggedIn()) api.all().then(r => { adminRows = r; badge(); }).catch(() => {});
+  addEventListener('hashchange', route); route();
+})();
+</script>
+</body>
+</html>

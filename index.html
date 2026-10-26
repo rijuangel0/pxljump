@@ -36,7 +36,7 @@ let save  = JSON.parse(localStorage.getItem('plat3bit')   || '{}');   // best st
 let times = JSON.parse(localStorage.getItem('plat3bit_t') || '{}');   // best time (s) per level id
 let mobile = (localStorage.getItem('plat3bit_mode') ??
   (('ontouchstart' in window || navigator.maxTouchPoints > 0) ? 'm' : 'p')) === 'm';
-let cur, orig, map, w, h, total, got, start, spawn, gate, arch;
+let cur, orig, map, w, h, total, got, start, spawn, cpSet, cpKey, gate, arch;
 let p, cam = {x:0, y:0}, won = false, ready = false, keys = {};
 let ticks = 0, running = false, toast = null;
 const ptrs = {}; let tk = {};
@@ -379,9 +379,29 @@ function setArch() {
 }
 function restart() {
   map = orig.map(r => [...r]);
-  got = 0; won = false; spawn = {...start};
+  got = 0; won = false; spawn = {...start}; cpSet = new Set(); cpKey = null;
   ticks = 0; running = false;
   setArch(); respawn();
+}
+
+// Checkpoint = a connected blob of cyan tiles. Spawn so the player covers the whole blob
+// (centred horizontally, bottom-aligned); if the blob is bigger than the player, centre on it.
+function cpBlob(x, y) {
+  const seen = new Set([x+','+y]), q = [[x,y]], t = [];
+  while (q.length) { const [a,b] = q.pop(); t.push([a,b]);
+    for (const [dx,dy] of [[1,0],[-1,0],[0,1],[0,-1]]) { const nx=a+dx, ny=b+dy, k=nx+','+ny;
+      if (!seen.has(k) && orig[ny]?.[nx] === 3) { seen.add(k); q.push([nx,ny]); } } }
+  return t;
+}
+function cpSeen(x, y) { return cpKey === x+','+y || cpSet.has(x+','+y); }
+function cpSpawn(x, y) {
+  const t = cpBlob(x, y);
+  for (const [a,b] of t) cpSet.add(a+','+b);
+  cpKey = x+','+y;
+  const x1 = Math.min(...t.map(a=>a[0])), x2 = Math.max(...t.map(a=>a[0]));
+  const y1 = Math.min(...t.map(a=>a[1])), y2 = Math.max(...t.map(a=>a[1]));
+  const sp = { x: x1 + Math.floor(((x2-x1+1) - PLW) / 2), y: (y2-y1+1) <= PLH ? y2 - PLH + 1 : y1 + Math.floor(((y2-y1+1) - PLH) / 2) };
+  return blocked(sp.x, sp.y) ? {x:p.x, y:p.y} : sp;   // fall back if that spot is inside a wall
 }
 function respawn() { p = {x:spawn.x, y:spawn.y, vy:0, ry:0, rx:0}; snapCam(true); }
 
@@ -544,7 +564,7 @@ function interact() {
   for (let j = 0; j < PLH; j++) for (let i = 0; i < PLW; i++) {
     const x = p.x+i, y = p.y+j, v = tile(x, y);
     if (v === 4) { respawn(); return; }
-    if (v === 3) spawn = {x:p.x, y:p.y};
+    if (v === 3 && !cpSeen(x, y)) spawn = cpSpawn(x, y);
     if (v === 6) { map[y][x] = 0; got++; setArch(); }
     if (v === 2 && pct() >= CLEAR) {
       won = true;
